@@ -2,9 +2,11 @@ package com.app.pakeplus
 
 import android.annotation.SuppressLint
 import android.graphics.Bitmap
+import android.os.Build
 import android.os.Bundle
 import android.view.GestureDetector
 import android.view.MotionEvent
+import android.view.WindowManager
 import android.webkit.WebChromeClient
 import android.webkit.WebResourceError
 import android.webkit.WebResourceRequest
@@ -25,6 +27,7 @@ import androidx.activity.enableEdgeToEdge
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.GestureDetectorCompat
 import androidx.core.view.ViewCompat
+import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 
 class MainActivity : AppCompatActivity() {
@@ -39,15 +42,24 @@ class MainActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
+        //允许window 的内容可以上移到刘海屏状态栏
+        WindowCompat.setDecorFitsSystemWindows(window, false)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+            val lp = window.attributes
+            lp.layoutInDisplayCutoutMode =
+                WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES
+            window.attributes = lp
+        }
+
         enableEdgeToEdge()
         setContentView(R.layout.single_main)
 
-        ViewCompat.setOnApplyWindowInsetsListener(findViewById(R.id.ConstraintLayout))
-        { view, insets ->
-            val systemBar = insets.getInsets(WindowInsetsCompat.Type.systemBars())
-            view.setPadding(systemBar.left, systemBar.top, systemBar.right, systemBar.bottom)
-            insets
-        }
+        // ViewCompat.setOnApplyWindowInsetsListener(findViewById(R.id.ConstraintLayout))
+        // { view, insets ->
+        //     val systemBar = insets.getInsets(WindowInsetsCompat.Type.systemBars())
+        //     view.setPadding(systemBar.left, systemBar.top, systemBar.right, 0)
+        //     insets
+        // }
 
         webView = findViewById<WebView>(R.id.webview)
 
