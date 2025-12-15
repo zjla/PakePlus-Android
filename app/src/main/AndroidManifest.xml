@@ -5,6 +5,30 @@
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
+    <!-- 允许打开哪些外部应用   -->
+    <queries>
+        <!-- 云盘 -->
+        <package android:name="com.baidu.netdisk" />
+        <package android:name="com.tencent.weiyun" />
+        <package android:name="com.google.android.apps.docs" />
+        <package android:name="com.dropbox.android" />
+        <package android:name="com.microsoft.skydrive" />
+
+        <!-- 社交/通讯 -->
+        <package android:name="com.tencent.mm" />
+        <package android:name="com.tencent.mobileqq" />
+        <package android:name="com.sina.weibo" />
+        <package android:name="com.whatsapp" />
+
+        <!-- 支付/电商 -->
+        <package android:name="com.eg.android.AlipayGphone" />
+        <package android:name="com.taobao.taobao" />
+        <package android:name="com.jingdong.app.mall" />
+
+        <!-- 浏览器/地图/其他 -->
+        <package android:name="com.android.chrome" />
+        <package android:name="com.autonavi.minimap" />
+    </queries>
     <application
         android:allowBackup="true"
         android:dataExtractionRules="@xml/data_extraction_rules"
