@@ -11,6 +11,7 @@ import android.os.Bundle
 import android.util.Log
 import android.view.GestureDetector
 import android.view.MotionEvent
+import android.view.View
 import android.view.WindowManager
 import android.webkit.WebChromeClient
 import android.webkit.WebResourceError
@@ -74,6 +75,9 @@ class MainActivity : AppCompatActivity() {
             javaScriptEnabled = true       // 启用JS
             domStorageEnabled = true       // 启用DOM存储（Vue 需要）
             allowFileAccess = true         // 允许文件访问
+            useWideViewPort = true
+            loadWithOverviewMode = true
+            mediaPlaybackRequiresUserGesture = false
             setSupportMultipleWindows(true)
         }
 
@@ -254,6 +258,7 @@ class MainActivity : AppCompatActivity() {
             super.doUpdateVisitedHistory(view, url, isReload)
         }
 
+
         override fun onReceivedError(
             view: WebView?,
             request: WebResourceRequest?,
@@ -286,6 +291,14 @@ class MainActivity : AppCompatActivity() {
             super.onProgressChanged(view, newProgress)
             val url = view?.url
             println("wev view url:$url")
+        }
+
+        override fun onShowCustomView(view: View?, callback: CustomViewCallback?) {
+            super.onShowCustomView(view, callback)
+        }
+
+        override fun onHideCustomView() {
+            super.onHideCustomView()
         }
     }
 }
