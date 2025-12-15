@@ -1,9 +1,14 @@
 package com.app.pakeplus
 
 import android.annotation.SuppressLint
+import android.content.ActivityNotFoundException
+import android.content.Context
+import android.content.Intent
 import android.graphics.Bitmap
+import android.net.Uri
 import android.os.Build
 import android.os.Bundle
+import android.util.Log
 import android.view.GestureDetector
 import android.view.MotionEvent
 import android.view.WindowManager
@@ -29,6 +34,8 @@ import androidx.core.view.GestureDetectorCompat
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
+import androidx.core.net.toUri
+import java.net.URISyntaxException
 
 class MainActivity : AppCompatActivity() {
 
@@ -42,7 +49,7 @@ class MainActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        //允许window 的内容可以上移到刘海屏状态栏
+        // 允许window 的内容可以上移到刘海屏状态栏
         WindowCompat.setDecorFitsSystemWindows(window, false)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
             val lp = window.attributes
@@ -126,8 +133,8 @@ class MainActivity : AppCompatActivity() {
             false
         }
 
-        webView.loadUrl("https://juejin.cn/")
-        // webView.loadUrl("file:///android_asset/index.html")
+        // webView.loadUrl("https://juejin.cn/")
+        webView.loadUrl("file:///android_asset/index.html")
 
 //        binding = ActivityMainBinding.inflate(layoutInflater)
 //        setContentView(R.layout.single_main)
@@ -183,6 +190,63 @@ class MainActivity : AppCompatActivity() {
 
         @Deprecated("Deprecated in Java", ReplaceWith("false"))
         override fun shouldOverrideUrlLoading(view: WebView?, url: String?): Boolean {
+            val url = url.toString()
+
+            // 检查链接是否是 HTTP/HTTPS，如果是，则继续在 WebView 中加载
+            if (url.startsWith("http://") || url.startsWith("https://")) {
+                return false // 返回 false，让 WebView 自己加载 URL
+            }
+
+            // --- 核心逻辑：处理外部应用链接 ---
+
+            // 1. 检查是否是 Intent URI (e.g., intent://...)
+            if (url.startsWith("intent://")) {
+                try {
+                    // 解析 Intent URI
+                    val intent = Intent.parseUri(url, Intent.URI_INTENT_SCHEME)
+
+                    // 检查设备上是否有应用可以处理此 Intent
+                    if (intent.resolveActivity(view?.context?.packageManager!!) != null) {
+                        view.context?.startActivity(intent)
+                        return true // 已经处理，阻止 WebView 加载
+                    }
+
+                    // 如果找不到能处理的应用，可以尝试打开备用 URL (如果 Intent 中有定义 fallback URL)
+                    val fallbackUrl = intent.getStringExtra("browser_fallback_url")
+                    if (!fallbackUrl.isNullOrEmpty()) {
+                        view.loadUrl(fallbackUrl)
+                        return true // 加载备用 URL
+                    }
+
+                } catch (e: URISyntaxException) {
+                    // 解析 Intent URI 失败
+                    Log.e("WebViewClient", "Bad Intent URI: $url", e)
+                } catch (e: ActivityNotFoundException) {
+                    // 找不到匹配的 Activity (外部应用未安装)，此情况通常在 `resolveActivity` 后捕获
+                    Log.e("WebViewClient", "No activity found to handle Intent: $url", e)
+                    // 您也可以在这里加载一个 "未安装应用" 的提示页面
+                }
+                // 如果是 Intent 但无法处理（例如未安装应用），您可以选择返回 false 让 WebView 尝试加载（通常会失败）
+                // 或者继续执行下面的 Scheme 检查
+            }
+
+            // 2. 检查是否是其他自定义 Scheme (e.g., weixin://, zhihu://)
+            // 注意：Intent URI 是更通用和推荐的方式，但有些应用可能直接使用 Scheme。
+            try {
+                val intent = Intent(Intent.ACTION_VIEW, url.toUri())
+                // 必须检查是否有应用可以处理此 Intent，否则会导致崩溃
+                if (intent.resolveActivity(view?.context?.packageManager!!) != null) {
+                    view.context?.startActivity(intent)
+                    return true // 已经处理，阻止 WebView 加载
+                } else {
+                    // 没有安装相应的应用
+                    Log.w("WebViewClient", "External app not installed for: $url")
+                    // 可以添加逻辑提示用户下载应用或打开相应的应用商店链接
+                }
+            } catch (e: Exception) {
+                Log.e("WebViewClient", "Error starting external app: $url", e)
+            }
+            // 如果不是外部应用 Scheme，也不是 HTTP/HTTPS，则返回 false，让 WebView 处理
             return false
         }
 
