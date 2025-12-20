@@ -1,10 +1,10 @@
 {
-  "name": "MyMobileApp",
-  "version": "1.0.0",
-  "description": "A sample mobile application",
-  "author": "Your Name",
-  "WebUrl": "https://pakeplus.com/",
-  "debug": true,
-  "userAgent": "",
-  "fullScreen": false
+    "name": "PakePlus",
+    "version": "1.0.0",
+    "description": "A sample mobile application by PakePlus",
+    "author": "1024coder",
+    "WebUrl": "https://pakeplus.com/",
+    "debug": false,
+    "userAgent": "",
+    "fullScreen": false
 }
