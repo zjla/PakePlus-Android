@@ -268,12 +268,20 @@ const initWebEnv = async (isHtml, webUrl, debug, fullScreen) => {
     const appJson = fs.readFileSync(appJsonPath, 'utf8')
     // appJson object
     const appJsonObj = JSON.parse(appJson)
+    // set fullScreen
+    if (fullScreen) {
+        appJsonObj.fullScreen = true
+    } else {
+        appJsonObj.fullScreen = false
+    }
+    // set html
     if (isHtml) {
         // update webUrl
         appJsonObj.WebUrl = 'file:///android_asset/index.html'
     } else {
         appJsonObj.WebUrl = webUrl
     }
+    // is debug
     if (debug) {
         // update debug
         appJsonObj.debug = true
