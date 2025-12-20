@@ -241,7 +241,7 @@ class MainActivity : AppCompatActivity() {
             val jsonObject = JSONObject(jsonString)
             // 提取字段
             val name = jsonObject.getString("name")
-            val webUrl = jsonObject.getString("WebUrl")
+            val webUrl = jsonObject.getString("webUrl")
             val debug = jsonObject.getBoolean("debug")
             val userAgent = jsonObject.getString("userAgent")
             val fullScreen = jsonObject.getBoolean("fullScreen")
