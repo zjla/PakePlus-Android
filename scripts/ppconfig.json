@@ -70,6 +70,7 @@
         }
     },
     "phone": {
+        "fullScreen": false,
         "safeArea": {
             "top": 0,
             "bottom": 0,
