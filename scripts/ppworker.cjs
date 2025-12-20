@@ -292,6 +292,7 @@ const initWebEnv = async (isHtml, webUrl, debug, fullScreen, userAgent) => {
         // update debug
         appJsonObj.debug = true
     } else {
+        appJsonObj.debug = false
         const vConsolePath = path.join(assetsPath, 'vConsole.js')
         // delete vConsole.js
         fs.removeSync(vConsolePath)
