@@ -57,6 +57,10 @@ class MainActivity : AppCompatActivity() {
         // parseJsonWithNative
         val config = parseJsonWithNative(this, "app.json")
         val fullScreen = config?.get("fullScreen") as? Boolean ?: false
+        val debug = config?.get("debug") as? Boolean ?: false
+        val userAgent = config?.get("userAgent") as? String ?: ""
+        val webUrl = config?.get("webUrl") as? String ?: "https://pakeplus.cn/"
+        // config fullscreen
         if (fullScreen) {
             window.setFlags(
                 WindowManager.LayoutParams.FLAG_FULLSCREEN,
@@ -84,22 +88,18 @@ class MainActivity : AppCompatActivity() {
                                 View.SYSTEM_UI_FLAG_LAYOUT_STABLE
                         )
             }
-        } else {
-            // set system safe area
-            ViewCompat.setOnApplyWindowInsetsListener(findViewById(R.id.ConstraintLayout))
-            { view, insets ->
-                val systemBar = insets.getInsets(WindowInsetsCompat.Type.systemBars())
-                view.setPadding(systemBar.left, systemBar.top, systemBar.right, 0)
-                insets
-            }
         }
         // 可以让内容视图的颜色延伸到屏幕边缘
         enableEdgeToEdge()
         setContentView(R.layout.single_main)
-
-
+        // set system safe area
+        ViewCompat.setOnApplyWindowInsetsListener(findViewById(R.id.ConstraintLayout))
+        { view, insets ->
+            val systemBar = insets.getInsets(WindowInsetsCompat.Type.systemBars())
+            view.setPadding(systemBar.left, systemBar.top, systemBar.right, 0)
+            insets
+        }
         webView = findViewById<WebView>(R.id.webview)
-
         webView.settings.apply {
             javaScriptEnabled = true       // 启用JS
             domStorageEnabled = true       // 启用DOM存储（Vue 需要）
@@ -110,7 +110,10 @@ class MainActivity : AppCompatActivity() {
             setSupportMultipleWindows(true)
         }
 
-        // webView.settings.userAgentString = ""
+        // set user agent
+        if (userAgent.isNotEmpty()) {
+            webView.settings.userAgentString = userAgent
+        }
 
         webView.settings.loadWithOverviewMode = true
         webView.settings.setSupportZoom(false)
@@ -119,7 +122,7 @@ class MainActivity : AppCompatActivity() {
         webView.clearCache(true)
 
         // inject js
-        webView.webViewClient = MyWebViewClient()
+        webView.webViewClient = MyWebViewClient(debug)
 
         // get web load progress
         webView.webChromeClient = MyChromeClient()
@@ -166,8 +169,8 @@ class MainActivity : AppCompatActivity() {
             false
         }
 
-        // webView.loadUrl("https://juejin.cn/")
-        webView.loadUrl("file:///android_asset/index.html")
+        // load webUrl or file:///android_asset/index.html
+        webView.loadUrl(webUrl)
 
 //        binding = ActivityMainBinding.inflate(layoutInflater)
 //        setContentView(R.layout.single_main)
@@ -267,10 +270,7 @@ class MainActivity : AppCompatActivity() {
 //        return navController.navigateUp(appBarConfiguration) || super.onSupportNavigateUp()
 //    }
 
-    inner class MyWebViewClient : WebViewClient() {
-
-        // vConsole debug
-        private var debug = false
+    inner class MyWebViewClient(val debug: Boolean) : WebViewClient() {
 
         @Deprecated("Deprecated in Java", ReplaceWith("false"))
         override fun shouldOverrideUrlLoading(view: WebView?, url: String?): Boolean {
