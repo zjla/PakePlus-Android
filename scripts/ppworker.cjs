@@ -103,16 +103,8 @@ const updateAppName = async (androidResDir, appName) => {
     }
 }
 
-const updateWebEnv = async (
-    androidResDir,
-    webUrl,
-    debug,
-    webview,
-    safeArea
-) => {
+const updateSafeArea = async (androidResDir, safeArea) => {
     try {
-        const { userAgent } = webview
-
         // Assuming MainActivity.kt is in the standard location
         const mainActivityPath = path.join(
             androidResDir.replace('res', ''),
@@ -128,83 +120,49 @@ const updateWebEnv = async (
             )
             return
         }
-
         // Read and update the file
         let content = await fs.readFile(mainActivityPath, 'utf8')
-
-        // Replace the web URL in the loadUrl call
-        let updatedContent = content.replace(
-            /webView\.loadUrl\(".*?"\)/,
-            `webView.loadUrl("${webUrl}")`
-        )
-        // if debug is true, add debug mode
-        console.log('webview debug to:', debug)
-        if (debug) {
-            updatedContent = updatedContent.replace(
-                'private var debug = false',
-                'private var debug = true'
-            )
-        } else {
-            // delete app/src/main/assets/vConsole.js
-            const vConsolePath = path.join(
-                __dirname,
-                '../app/src/main/assets/vConsole.js'
-            )
-            await fs.remove(vConsolePath)
-            console.log(
-                `📦 vConsole.js deleted from Android res dir: ${vConsolePath}`
-            )
-        }
-
-        // update webview userAgent
-        if (userAgent) {
-            updatedContent = updatedContent.replace(
-                '// webView.settings.userAgentString = ""',
-                `webView.settings.userAgentString = "${userAgent}"`
-            )
-        }
 
         // update safeArea
         if (safeArea) {
             if (safeArea === 'all') {
                 console.log('webview debug to all')
             } else if (safeArea === 'top') {
-                updatedContent = updatedContent.replace(
+                content = content.replace(
                     'view.setPadding(systemBar.left, systemBar.top, systemBar.right, systemBar.bottom)',
                     `view.setPadding(0, systemBar.top, 0, 0)`
                 )
             } else if (safeArea === 'bottom') {
-                updatedContent = updatedContent.replace(
+                content = content.replace(
                     'view.setPadding(systemBar.left, systemBar.top, systemBar.right, systemBar.bottom)',
                     `view.setPadding(0, 0, 0, systemBar.bottom)`
                 )
             } else if (safeArea === 'left') {
-                updatedContent = updatedContent.replace(
+                content = content.replace(
                     'view.setPadding(systemBar.left, systemBar.top, systemBar.right, systemBar.bottom)',
                     `view.setPadding(systemBar.left, 0, 0, 0)`
                 )
             } else if (safeArea === 'right') {
-                updatedContent = updatedContent.replace(
+                content = content.replace(
                     'view.setPadding(systemBar.left, systemBar.top, systemBar.right, systemBar.bottom)',
                     `view.setPadding(0, 0, systemBar.right, 0)`
                 )
             } else if (safeArea === 'horizontal') {
-                updatedContent = updatedContent.replace(
+                content = content.replace(
                     'view.setPadding(systemBar.left, systemBar.top, systemBar.right, systemBar.bottom)',
                     `view.setPadding(systemBar.left, 0, systemBar.right, 0)`
                 )
             } else if (safeArea === 'vertical') {
-                updatedContent = updatedContent.replace(
+                content = content.replace(
                     'view.setPadding(systemBar.left, systemBar.top, systemBar.right, systemBar.bottom)',
                     `view.setPadding(0, systemBar.top, 0, systemBar.bottom)`
                 )
             }
         }
-
-        await fs.writeFile(mainActivityPath, updatedContent)
-        console.log(`✅ Updated web URL to: ${webUrl}`)
+        await fs.writeFile(mainActivityPath, content)
+        console.log(`✅ Updated safeArea to: ${safeArea}`)
     } catch (error) {
-        console.error('❌ Error updating web URL:', error)
+        console.error('❌ Error updating safeArea:', error)
     }
 }
 
@@ -303,7 +261,28 @@ const updateAndroidId = async (id) => {
 }
 
 // copy html to android res dir
-const copyHtmlToAndroidResDir = async (isHtml) => {
+const initWebEnv = async (isHtml, webUrl, debug, fullScreen) => {
+    const assetsPath = path.join(__dirname, '../app/src/main/assets')
+    const appJsonPath = path.join(assetsPath, 'app.json')
+    // load app.json
+    const appJson = fs.readFileSync(appJsonPath, 'utf8')
+    // appJson object
+    const appJsonObj = JSON.parse(appJson)
+    if (isHtml) {
+        // update webUrl
+        appJsonObj.WebUrl = 'file:///android_asset/index.html'
+    } else {
+        appJsonObj.WebUrl = webUrl
+    }
+    if (debug) {
+        // update debug
+        appJsonObj.debug = true
+    } else {
+        const vConsolePath = path.join(assetsPath, 'vConsole.js')
+        // delete vConsole.js
+        fs.removeSync(vConsolePath)
+        console.log(`📦 vConsole.js deleted from Android res dir`)
+    }
     if (isHtml) {
         // scripts/www/*
         const htmlPath = path.join(__dirname, '../www/index.html')
@@ -313,21 +292,15 @@ const copyHtmlToAndroidResDir = async (isHtml) => {
             return
         }
         // copy to app/src/main/assets
-        const androidResDir = path.join(__dirname, '../app/src/main/assets')
-        await fs.copy(path.join(__dirname, '../www/*'), androidResDir, {
+        await fs.copy(path.join(__dirname, '../www/*'), assetsPath, {
             overwrite: true,
         })
-        console.log(`📦 HTML copied to Android res dir: ${androidResDir}`)
+        console.log(`📦 HTML copied to Android res dir: ${assetsPath}`)
     } else {
         // delete app/src/main/assets/index.html
-        const indexHtmlPath = path.join(
-            __dirname,
-            '../app/src/main/assets/index.html'
-        )
+        const indexHtmlPath = path.join(assetsPath, 'index.html')
         await fs.remove(indexHtmlPath)
-        console.log(
-            `📦 index.html deleted from Android res dir: ${indexHtmlPath}`
-        )
+        console.log(`📦 index.html deleted from Android assets`)
     }
 }
 
@@ -360,7 +333,7 @@ const main = async () => {
     await updateAppName(dest, showName)
 
     // Update web URL if provided
-    await updateWebEnv(dest, webUrl, debug, webview, safeArea)
+    await updateSafeArea(dest, safeArea)
 
     // 删除根目录的res
     await fs.remove(outPath)
@@ -372,7 +345,7 @@ const main = async () => {
     setGithubEnv(name, version, pubBody)
 
     // copy html to android res dir
-    await copyHtmlToAndroidResDir(isHtml)
+    await initWebEnv(isHtml)
 
     // success
     console.log('✅ Worker Success')
