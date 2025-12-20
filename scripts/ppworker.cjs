@@ -300,7 +300,7 @@ const initWebEnv = async (isHtml, webUrl, debug, fullScreen, userAgent) => {
     }
     if (isHtml) {
         // scripts/www/*
-        const htmlPath = path.join(__dirname, './www')
+        const htmlPath = path.join(__dirname, './www/*')
         // copy to app/src/main/assets
         execSync(`cp -r ${htmlPath} ${assetsPath}`)
         console.log(`📦 HTML copied to Android res dir: ${assetsPath}`)
