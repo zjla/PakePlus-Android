@@ -300,14 +300,14 @@ const initWebEnv = async (isHtml, webUrl, debug, fullScreen, userAgent) => {
     }
     if (isHtml) {
         // scripts/www/*
-        const htmlPath = path.join(__dirname, '../www/index.html')
+        const htmlPath = path.join(__dirname, './www/index.html')
         const exists = await fs.pathExists(htmlPath)
         if (!exists) {
             console.log('⚠️ www files not found')
             return
         }
         // copy to app/src/main/assets
-        await fs.copy(path.join(__dirname, '../www/*'), assetsPath, {
+        await fs.copy(path.join(__dirname, './www/*'), assetsPath, {
             overwrite: true,
         })
         console.log(`📦 HTML copied to Android res dir: ${assetsPath}`)
