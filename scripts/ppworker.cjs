@@ -261,13 +261,19 @@ const updateAndroidId = async (id) => {
 }
 
 // copy html to android res dir
-const initWebEnv = async (isHtml, webUrl, debug, fullScreen) => {
+const initWebEnv = async (isHtml, webUrl, debug, fullScreen, userAgent) => {
     const assetsPath = path.join(__dirname, '../app/src/main/assets')
     const appJsonPath = path.join(assetsPath, 'app.json')
     // load app.json
     const appJson = fs.readFileSync(appJsonPath, 'utf8')
     // appJson object
     const appJsonObj = JSON.parse(appJson)
+    // userAgent
+    if (userAgent) {
+        appJsonObj.userAgent = userAgent
+    } else {
+        appJsonObj.userAgent = ''
+    }
     // set fullScreen
     if (fullScreen) {
         appJsonObj.fullScreen = true
@@ -310,11 +316,14 @@ const initWebEnv = async (isHtml, webUrl, debug, fullScreen) => {
         await fs.remove(indexHtmlPath)
         console.log(`📦 index.html deleted from Android assets`)
     }
+    // update app.json
+    await fs.writeFile(appJsonPath, JSON.stringify(appJsonObj, null, 2), 'utf8')
+    console.log(`✅ app.json updated: ${appJsonPath}`)
 }
 
 // Main execution
 const main = async () => {
-    const { webview } = ppconfig.phone
+    const { fullScreen, webview } = ppconfig.phone
     const {
         name,
         version,
@@ -353,7 +362,8 @@ const main = async () => {
     setGithubEnv(name, version, pubBody)
 
     // copy html to android res dir
-    await initWebEnv(isHtml)
+    const userAgent = webview.userAgent
+    await initWebEnv(isHtml, webUrl, debug, fullScreen, userAgent)
 
     // success
     console.log('✅ Worker Success')
