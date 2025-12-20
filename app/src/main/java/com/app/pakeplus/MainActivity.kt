@@ -208,35 +208,8 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    // load json from assets
-    fun loadJsonFromAssets(context: Context, jsonFilePath: String): String? {
-        return try {
-            // 1. 获取AssetManager实例，访问assets目录
-            val assetManager = context.assets
-            // 2. 打开JSON文件的输入流
-            val inputStream = assetManager.open(jsonFilePath)
-            // 3. 将输入流转换为BufferedReader，方便读取字符串
-            val bufferedReader = BufferedReader(InputStreamReader(inputStream))
-            // 4. 读取所有内容并拼接为JSON字符串
-            val stringBuilder = StringBuilder()
-            var line: String?
-            while (bufferedReader.readLine().also { line = it } != null) {
-                stringBuilder.append(line)
-            }
-            // 5. 关闭流资源
-            bufferedReader.close()
-            inputStream.close()
-            // 返回JSON字符串
-            stringBuilder.toString()
-        } catch (e: IOException) {
-            // 捕获文件不存在、读取失败等异常
-            e.printStackTrace()
-            null
-        }
-    }
-
     fun parseJsonWithNative(context: Context, jsonFilePath: String): Map<String, Any>? {
-        val jsonString = loadJsonFromAssets(context, jsonFilePath) ?: return null
+        val jsonString = assets.open(jsonFilePath).bufferedReader().use { it.readText() }
         return try {
             val jsonObject = JSONObject(jsonString)
             // 提取字段
