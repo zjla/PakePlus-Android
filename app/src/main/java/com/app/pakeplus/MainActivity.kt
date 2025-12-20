@@ -60,7 +60,7 @@ class MainActivity : AppCompatActivity() {
         if (fullScreen) {
             window.setFlags(
                 WindowManager.LayoutParams.FLAG_FULLSCREEN,
-                WindowManager.LayoutParams.FLAG_FULLSCREEN
+                WindowManager.LayoutParams.FLAG_FULLSCREEN,
             )
             window.setFlags(
                 WindowManager.LayoutParams.FLAG_TRANSLUCENT_NAVIGATION,
@@ -84,16 +84,19 @@ class MainActivity : AppCompatActivity() {
                                 View.SYSTEM_UI_FLAG_LAYOUT_STABLE
                         )
             }
+        } else {
+            // set system safe area
+            ViewCompat.setOnApplyWindowInsetsListener(findViewById(R.id.ConstraintLayout))
+            { view, insets ->
+                val systemBar = insets.getInsets(WindowInsetsCompat.Type.systemBars())
+                view.setPadding(systemBar.left, systemBar.top, systemBar.right, 0)
+                insets
+            }
         }
         // 可以让内容视图的颜色延伸到屏幕边缘
         enableEdgeToEdge()
         setContentView(R.layout.single_main)
-        ViewCompat.setOnApplyWindowInsetsListener(findViewById(R.id.ConstraintLayout))
-        { view, insets ->
-            val systemBar = insets.getInsets(WindowInsetsCompat.Type.systemBars())
-            view.setPadding(systemBar.left, systemBar.top, systemBar.right, 0)
-            insets
-        }
+
 
         webView = findViewById<WebView>(R.id.webview)
 
