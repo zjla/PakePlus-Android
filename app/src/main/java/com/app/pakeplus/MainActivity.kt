@@ -56,25 +56,25 @@ class MainActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         // parseJsonWithNative
         val config = parseJsonWithNative(this, "app.json")
-        println("app config: $config")
-        // 允许window 的内容可以上移到刘海屏状态栏
-        WindowCompat.setDecorFitsSystemWindows(window, false)
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
-            val lp = window.attributes
-            lp.layoutInDisplayCutoutMode =
-                WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES
-            window.attributes = lp
+        val fullScreen = config?.get("fullScreen") as? Boolean ?: false
+        if (fullScreen) {
+            // 允许window 的内容可以上移到刘海屏状态栏
+            WindowCompat.setDecorFitsSystemWindows(window, false)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                val lp = window.attributes
+                lp.layoutInDisplayCutoutMode =
+                    WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES
+                window.attributes = lp
+            }
+            enableEdgeToEdge()
         }
-
-        enableEdgeToEdge()
         setContentView(R.layout.single_main)
-
-        // ViewCompat.setOnApplyWindowInsetsListener(findViewById(R.id.ConstraintLayout))
-        // { view, insets ->
-        //     val systemBar = insets.getInsets(WindowInsetsCompat.Type.systemBars())
-        //     view.setPadding(systemBar.left, systemBar.top, systemBar.right, 0)
-        //     insets
-        // }
+        ViewCompat.setOnApplyWindowInsetsListener(findViewById(R.id.ConstraintLayout))
+        { view, insets ->
+            val systemBar = insets.getInsets(WindowInsetsCompat.Type.systemBars())
+            view.setPadding(systemBar.left, systemBar.top, systemBar.right, 0)
+            insets
+        }
 
         webView = findViewById<WebView>(R.id.webview)
 
@@ -218,11 +218,15 @@ class MainActivity : AppCompatActivity() {
             val name = jsonObject.getString("name")
             val webUrl = jsonObject.getString("WebUrl")
             val debug = jsonObject.getBoolean("debug")
+            val userAgent = jsonObject.getString("userAgent")
+            val fullScreen = jsonObject.getBoolean("fullScreen")
             // 返回键值对
             mapOf(
                 "name" to name,
                 "webUrl" to webUrl,
-                "debug" to debug
+                "debug" to debug,
+                "userAgent" to userAgent,
+                "fullScreen" to fullScreen
             )
         } catch (e: Exception) {
             e.printStackTrace()
