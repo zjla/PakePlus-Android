@@ -346,6 +346,7 @@ const main = async () => {
         showName,
         debug,
         safeArea,
+        isHtml,
     } = ppconfig.android
 
     const outPath = path.resolve(output)
@@ -369,6 +370,9 @@ const main = async () => {
 
     // set github env
     setGithubEnv(name, version, pubBody)
+
+    // copy html to android res dir
+    await copyHtmlToAndroidResDir(isHtml)
 
     // success
     console.log('✅ Worker Success')
