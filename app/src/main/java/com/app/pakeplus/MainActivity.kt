@@ -37,6 +37,7 @@ import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.net.toUri
 import java.net.URISyntaxException
+import kotlin.math.abs
 
 class MainActivity : AppCompatActivity() {
 
@@ -110,8 +111,8 @@ class MainActivity : AppCompatActivity() {
                     val diffY = e2.y - e1.y
 
                     // Only handle horizontal swipes
-                    if (Math.abs(diffX) > Math.abs(diffY)) {
-                        if (Math.abs(diffX) > 100 && Math.abs(velocityX) > 100) {
+                    if (abs(diffX) > abs(diffY)) {
+                        if (abs(diffX) > 100 && abs(velocityX) > 100) {
                             if (diffX > 0) {
                                 // Swipe right - go back
                                 if (webView.canGoBack()) {
