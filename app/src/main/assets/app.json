@@ -4,7 +4,7 @@
   "description": "A sample mobile application",
   "author": "Your Name",
   "WebUrl": "https://pakeplus.com/",
-  "debug": false,
+  "debug": true,
   "userAgent": "",
   "fullScreen": false
 }
