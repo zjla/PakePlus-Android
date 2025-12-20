@@ -58,16 +58,35 @@ class MainActivity : AppCompatActivity() {
         val config = parseJsonWithNative(this, "app.json")
         val fullScreen = config?.get("fullScreen") as? Boolean ?: false
         if (fullScreen) {
-            // 允许window 的内容可以上移到刘海屏状态栏
-            WindowCompat.setDecorFitsSystemWindows(window, false)
+            window.setFlags(
+                WindowManager.LayoutParams.FLAG_FULLSCREEN,
+                WindowManager.LayoutParams.FLAG_FULLSCREEN
+            )
+            window.setFlags(
+                WindowManager.LayoutParams.FLAG_TRANSLUCENT_NAVIGATION,
+                WindowManager.LayoutParams.FLAG_TRANSLUCENT_NAVIGATION
+            )
+            window.navigationBarColor = android.graphics.Color.TRANSPARENT
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
                 val lp = window.attributes
                 lp.layoutInDisplayCutoutMode =
                     WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES
                 window.attributes = lp
+                // 允许window 的内容可以上移到刘海屏状态栏
+                window.setDecorFitsSystemWindows(false)
+            } else {
+                window.decorView.systemUiVisibility = (
+                        View.SYSTEM_UI_FLAG_FULLSCREEN or
+                                View.SYSTEM_UI_FLAG_HIDE_NAVIGATION or
+                                View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY or
+                                View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN or
+                                View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION or
+                                View.SYSTEM_UI_FLAG_LAYOUT_STABLE
+                        )
             }
-            enableEdgeToEdge()
         }
+        // 可以让内容视图的颜色延伸到屏幕边缘
+        enableEdgeToEdge()
         setContentView(R.layout.single_main)
         ViewCompat.setOnApplyWindowInsetsListener(findViewById(R.id.ConstraintLayout))
         { view, insets ->
