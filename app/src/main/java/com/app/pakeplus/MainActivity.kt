@@ -36,6 +36,10 @@ import androidx.core.view.ViewCompat
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.net.toUri
+import org.json.JSONObject
+import java.io.BufferedReader
+import java.io.IOException
+import java.io.InputStreamReader
 import java.net.URISyntaxException
 import kotlin.math.abs
 
@@ -50,7 +54,9 @@ class MainActivity : AppCompatActivity() {
     @SuppressLint("SetJavaScriptEnabled", "ClickableViewAccessibility")
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-
+        // parseJsonWithNative
+        val config = parseJsonWithNative(this, "app.json")
+        println("app config: $config")
         // 允许window 的内容可以上移到刘海屏状态栏
         WindowCompat.setDecorFitsSystemWindows(window, false)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
@@ -174,6 +180,53 @@ class MainActivity : AppCompatActivity() {
             webView.goBack()
         } else {
             super.onBackPressed()
+        }
+    }
+
+    // load json from assets
+    fun loadJsonFromAssets(context: Context, jsonFilePath: String): String? {
+        return try {
+            // 1. 获取AssetManager实例，访问assets目录
+            val assetManager = context.assets
+            // 2. 打开JSON文件的输入流
+            val inputStream = assetManager.open(jsonFilePath)
+            // 3. 将输入流转换为BufferedReader，方便读取字符串
+            val bufferedReader = BufferedReader(InputStreamReader(inputStream))
+            // 4. 读取所有内容并拼接为JSON字符串
+            val stringBuilder = StringBuilder()
+            var line: String?
+            while (bufferedReader.readLine().also { line = it } != null) {
+                stringBuilder.append(line)
+            }
+            // 5. 关闭流资源
+            bufferedReader.close()
+            inputStream.close()
+            // 返回JSON字符串
+            stringBuilder.toString()
+        } catch (e: IOException) {
+            // 捕获文件不存在、读取失败等异常
+            e.printStackTrace()
+            null
+        }
+    }
+
+    fun parseJsonWithNative(context: Context, jsonFilePath: String): Map<String, Any>? {
+        val jsonString = loadJsonFromAssets(context, jsonFilePath) ?: return null
+        return try {
+            val jsonObject = JSONObject(jsonString)
+            // 提取字段
+            val name = jsonObject.getString("name")
+            val webUrl = jsonObject.getString("WebUrl")
+            val debug = jsonObject.getBoolean("debug")
+            // 返回键值对
+            mapOf(
+                "name" to name,
+                "webUrl" to webUrl,
+                "debug" to debug
+            )
+        } catch (e: Exception) {
+            e.printStackTrace()
+            null
         }
     }
 
