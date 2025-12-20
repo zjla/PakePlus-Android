@@ -283,9 +283,9 @@ const initWebEnv = async (isHtml, webUrl, debug, fullScreen, userAgent) => {
     // set html
     if (isHtml) {
         // update webUrl
-        appJsonObj.WebUrl = 'file:///android_asset/index.html'
+        appJsonObj.webUrl = 'file:///android_asset/index.html'
     } else {
-        appJsonObj.WebUrl = webUrl
+        appJsonObj.webUrl = webUrl
     }
     // is debug
     if (debug) {
