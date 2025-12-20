@@ -144,6 +144,16 @@ const updateWebEnv = async (
                 'private var debug = false',
                 'private var debug = true'
             )
+        } else {
+            // delete app/src/main/assets/vConsole.js
+            const vConsolePath = path.join(
+                __dirname,
+                '../app/src/main/assets/vConsole.js'
+            )
+            await fs.remove(vConsolePath)
+            console.log(
+                `📦 vConsole.js deleted from Android res dir: ${vConsolePath}`
+            )
         }
 
         // update webview userAgent
@@ -289,6 +299,35 @@ const updateAndroidId = async (id) => {
         console.log(`✅ Updated applicationId to: ${id}`)
     } else {
         console.log('ℹ️ No changes needed in build.gradle.kts')
+    }
+}
+
+// copy html to android res dir
+const copyHtmlToAndroidResDir = async (isHtml) => {
+    if (isHtml) {
+        // scripts/www/*
+        const htmlPath = path.join(__dirname, '../www/index.html')
+        const exists = await fs.pathExists(htmlPath)
+        if (!exists) {
+            console.log('⚠️ www files not found')
+            return
+        }
+        // copy to app/src/main/assets
+        const androidResDir = path.join(__dirname, '../app/src/main/assets')
+        await fs.copy(path.join(__dirname, '../www/*'), androidResDir, {
+            overwrite: true,
+        })
+        console.log(`📦 HTML copied to Android res dir: ${androidResDir}`)
+    } else {
+        // delete app/src/main/assets/index.html
+        const indexHtmlPath = path.join(
+            __dirname,
+            '../app/src/main/assets/index.html'
+        )
+        await fs.remove(indexHtmlPath)
+        console.log(
+            `📦 index.html deleted from Android res dir: ${indexHtmlPath}`
+        )
     }
 }
 
