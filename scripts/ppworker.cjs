@@ -261,7 +261,7 @@ const updateAndroidId = async (id) => {
 }
 
 // copy html to android res dir
-const initWebEnv = async (isHtml, webUrl, debug, fullScreen, userAgent) => {
+const initWebEnv = async (isHtml, webUrl, debug, safeArea, userAgent) => {
     const assetsPath = path.join(__dirname, '../app/src/main/assets')
     const appJsonPath = path.join(assetsPath, 'app.json')
     // load app.json
@@ -275,7 +275,7 @@ const initWebEnv = async (isHtml, webUrl, debug, fullScreen, userAgent) => {
         appJsonObj.userAgent = ''
     }
     // set fullScreen
-    if (fullScreen) {
+    if (safeArea === 'fullscreen') {
         appJsonObj.fullScreen = true
     } else {
         appJsonObj.fullScreen = false
@@ -317,7 +317,7 @@ const initWebEnv = async (isHtml, webUrl, debug, fullScreen, userAgent) => {
 
 // Main execution
 const main = async () => {
-    const { fullScreen, webview } = ppconfig.phone
+    const { webview } = ppconfig.phone
     const {
         name,
         version,
@@ -357,7 +357,7 @@ const main = async () => {
 
     // copy html to android res dir
     const userAgent = webview.userAgent
-    await initWebEnv(isHtml, webUrl, debug, fullScreen, userAgent)
+    await initWebEnv(isHtml, webUrl, debug, safeArea, userAgent)
 
     // success
     console.log('✅ Worker Success')
