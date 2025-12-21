@@ -60,6 +60,8 @@ class MainActivity : AppCompatActivity() {
         val debug = config?.get("debug") as? Boolean ?: false
         val userAgent = config?.get("userAgent") as? String ?: ""
         val webUrl = config?.get("webUrl") as? String ?: "https://pakeplus.cn/"
+        // enable debug by chrome://inspect
+        WebView.setWebContentsDebuggingEnabled(debug)
         // config fullscreen
         if (fullScreen) {
             window.setFlags(
@@ -76,8 +78,6 @@ class MainActivity : AppCompatActivity() {
                 lp.layoutInDisplayCutoutMode =
                     WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES
                 window.attributes = lp
-                // 允许window 的内容可以上移到刘海屏状态栏
-                window.setDecorFitsSystemWindows(false)
             } else {
                 window.decorView.systemUiVisibility = (
                         View.SYSTEM_UI_FLAG_FULLSCREEN or
@@ -109,7 +109,7 @@ class MainActivity : AppCompatActivity() {
             mediaPlaybackRequiresUserGesture = false
             setSupportMultipleWindows(true)
         }
-
+        webView
         // set user agent
         if (userAgent.isNotEmpty()) {
             webView.settings.userAgentString = userAgent
