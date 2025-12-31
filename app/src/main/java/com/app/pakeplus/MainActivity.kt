@@ -5,7 +5,6 @@ import android.content.ActivityNotFoundException
 import android.content.Context
 import android.content.Intent
 import android.graphics.Bitmap
-import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.util.Log
@@ -33,13 +32,9 @@ import androidx.activity.enableEdgeToEdge
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.GestureDetectorCompat
 import androidx.core.view.ViewCompat
-import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.net.toUri
 import org.json.JSONObject
-import java.io.BufferedReader
-import java.io.IOException
-import java.io.InputStreamReader
 import java.net.URISyntaxException
 import kotlin.math.abs
 
@@ -101,10 +96,13 @@ class MainActivity : AppCompatActivity() {
         }
         webView = findViewById<WebView>(R.id.webview)
         webView.settings.apply {
-            javaScriptEnabled = true       // 启用JS
-            domStorageEnabled = true       // 启用DOM存储（Vue 需要）
-            allowFileAccess = true         // 允许文件访问
+            javaScriptEnabled = true
+            domStorageEnabled = true
+            allowFileAccess = true
             useWideViewPort = true
+            allowFileAccessFromFileURLs = true
+            allowContentAccess = true
+            allowUniversalAccessFromFileURLs = true
             loadWithOverviewMode = true
             mediaPlaybackRequiresUserGesture = false
             setSupportMultipleWindows(true)
@@ -249,13 +247,7 @@ class MainActivity : AppCompatActivity() {
         override fun shouldOverrideUrlLoading(view: WebView?, url: String?): Boolean {
             val url = url.toString()
 
-            // 检查链接是否是 HTTP/HTTPS，如果是，则继续在 WebView 中加载
-            if (url.startsWith("http://") || url.startsWith("https://")) {
-                return false // 返回 false，让 WebView 自己加载 URL
-            }
-
-            // --- 核心逻辑：处理外部应用链接 ---
-
+            // --- 处理外部应用链接 ---
             // 1. 检查是否是 Intent URI (e.g., intent://...)
             if (url.startsWith("intent://")) {
                 try {
@@ -310,7 +302,6 @@ class MainActivity : AppCompatActivity() {
         override fun doUpdateVisitedHistory(view: WebView?, url: String?, isReload: Boolean) {
             super.doUpdateVisitedHistory(view, url, isReload)
         }
-
 
         override fun onReceivedError(
             view: WebView?,
