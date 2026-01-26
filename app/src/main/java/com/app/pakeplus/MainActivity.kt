@@ -105,7 +105,7 @@ class MainActivity : AppCompatActivity() {
             allowUniversalAccessFromFileURLs = true
             loadWithOverviewMode = true
             mediaPlaybackRequiresUserGesture = false
-            setSupportMultipleWindows(true)
+            // setSupportMultipleWindows(true)
         }
         webView
         // set user agent
