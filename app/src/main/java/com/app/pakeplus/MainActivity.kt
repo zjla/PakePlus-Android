@@ -13,15 +13,15 @@ import android.view.GestureDetector
 import android.view.MotionEvent
 import android.view.View
 import android.view.WindowManager
+import android.webkit.ValueCallback
 import android.webkit.WebChromeClient
-import android.webkit.JavascriptInterface
 import android.webkit.WebResourceError
 import android.webkit.WebResourceRequest
 import android.webkit.WebView
 import android.webkit.WebViewClient
-import android.webkit.WebView.WebViewTransport
-import android.webkit.URLUtil
 import androidx.activity.enableEdgeToEdge
+import androidx.activity.result.ActivityResultLauncher
+import androidx.activity.result.contract.ActivityResultContracts
 // import android.view.Menu
 // import android.view.WindowInsets
 // import com.google.android.material.snackbar.Snackbar
@@ -36,16 +36,10 @@ import androidx.activity.enableEdgeToEdge
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.GestureDetectorCompat
 import androidx.core.view.ViewCompat
-import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.net.toUri
 import org.json.JSONObject
-import java.io.BufferedReader
-import java.io.IOException
-import java.io.InputStreamReader
-import java.net.URI
 import java.net.URISyntaxException
-import java.util.Locale
 import kotlin.math.abs
 
 class MainActivity : AppCompatActivity() {
@@ -55,22 +49,43 @@ class MainActivity : AppCompatActivity() {
 
     private lateinit var webView: WebView
     private lateinit var gestureDetector: GestureDetectorCompat
+    private var fileUploadCallback: ValueCallback<Array<Uri>>? = null
+    private lateinit var fileChooserLauncher: ActivityResultLauncher<Intent>
 
     @SuppressLint("SetJavaScriptEnabled", "ClickableViewAccessibility")
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        val packageInfo = packageManager.getPackageInfo(packageName, 0)
-        val versionName = packageInfo.versionName ?: "unknown"
-        val versionCode = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
-            packageInfo.longVersionCode
-        } else {
-            @Suppress("DEPRECATION")
-            packageInfo.versionCode.toLong()
+        
+        // 初始化文件选择器
+        fileChooserLauncher = registerForActivityResult(
+            ActivityResultContracts.StartActivityForResult()
+        ) { result ->
+            val resultCode = result.resultCode
+            val data = result.data
+            
+            if (fileUploadCallback == null) return@registerForActivityResult
+            
+            var results: Array<Uri>? = null
+            
+            if (resultCode == RESULT_OK && data != null) {
+                val dataString = data.dataString
+                val clipData = data.clipData
+                
+                if (clipData != null) {
+                    // 多文件选择
+                    results = Array(clipData.itemCount) { i ->
+                        clipData.getItemAt(i).uri
+                    }
+                } else if (dataString != null) {
+                    // 单文件选择
+                    results = arrayOf(Uri.parse(dataString))
+                }
+            }
+            
+            fileUploadCallback?.onReceiveValue(results)
+            fileUploadCallback = null
         }
-        Log.i(
-            "AppStartup",
-            "Build versionName=$versionName versionCode=$versionCode ts=${System.currentTimeMillis()}"
-        )
+        
         // parseJsonWithNative
         val config = parseJsonWithNative(this, "app.json")
         val fullScreen = config?.get("fullScreen") as? Boolean ?: false
@@ -118,14 +133,16 @@ class MainActivity : AppCompatActivity() {
         }
         webView = findViewById<WebView>(R.id.webview)
         webView.settings.apply {
-            javaScriptEnabled = true       // 启用JS
-            domStorageEnabled = true       // 启用DOM存储（Vue 需要）
-            allowFileAccess = true         // 允许文件访问
+            javaScriptEnabled = true
+            domStorageEnabled = true
+            allowFileAccess = true
             useWideViewPort = true
+            allowFileAccessFromFileURLs = true
+            allowContentAccess = true
+            allowUniversalAccessFromFileURLs = true
             loadWithOverviewMode = true
             mediaPlaybackRequiresUserGesture = false
-            setSupportMultipleWindows(true)
-            javaScriptCanOpenWindowsAutomatically = true
+            // setSupportMultipleWindows(true)
         }
         webView
         // set user agent
@@ -139,28 +156,11 @@ class MainActivity : AppCompatActivity() {
         // clear cache
         webView.clearCache(true)
 
-        // JS bridge for window.App.openBrowser / window.native.openOuter
-        val jsBridge = JsBridge(this)
-        webView.addJavascriptInterface(jsBridge, "App")
-        webView.addJavascriptInterface(jsBridge, "native")
-
-        // open download links in external browser
-        webView.setDownloadListener { url, _, _, _, _ ->
-            if (url.isNullOrBlank()) return@setDownloadListener
-            val safeUrl = if (URLUtil.isNetworkUrl(url)) url else return@setDownloadListener
-            Log.i("WebViewClient", "DownloadListener open external: $safeUrl")
-            try {
-                startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(safeUrl)))
-            } catch (e: Exception) {
-                Log.e("WebViewClient", "Failed to open download url: $safeUrl", e)
-            }
-        }
-
         // inject js
         webView.webViewClient = MyWebViewClient(debug)
 
         // get web load progress
-        webView.webChromeClient = MyChromeClient()
+        webView.webChromeClient = MyChromeClient(this)
 
         // Setup gesture detector
         gestureDetector =
@@ -284,13 +284,7 @@ class MainActivity : AppCompatActivity() {
         override fun shouldOverrideUrlLoading(view: WebView?, url: String?): Boolean {
             val url = url.toString()
 
-            // 检查链接是否是 HTTP/HTTPS，如果是，则继续在 WebView 中加载
-            if (url.startsWith("http://") || url.startsWith("https://")) {
-                return false // 返回 false，让 WebView 自己加载 URL
-            }
-
-            // --- 核心逻辑：处理外部应用链接 ---
-
+            // --- 处理外部应用链接 ---
             // 1. 检查是否是 Intent URI (e.g., intent://...)
             if (url.startsWith("intent://")) {
                 try {
@@ -346,7 +340,6 @@ class MainActivity : AppCompatActivity() {
             super.doUpdateVisitedHistory(view, url, isReload)
         }
 
-
         override fun onReceivedError(
             view: WebView?,
             request: WebResourceRequest?,
@@ -372,32 +365,9 @@ class MainActivity : AppCompatActivity() {
             val injectJs = assets.open("custom.js").bufferedReader().use { it.readText() }
             view?.evaluateJavascript(injectJs, null)
         }
-
-        override fun shouldOverrideUrlLoading(
-            view: WebView?,
-            request: WebResourceRequest?
-        ): Boolean {
-            val url = request?.url?.toString() ?: return false
-            // For main-frame HTTP/HTTPS, keep in WebView
-            if (url.startsWith("http://") || url.startsWith("https://")) {
-                if (request?.isForMainFrame == true && isLikelyDownloadUrl(url)) {
-                    Log.i("WebViewClient", "MainFrame download open external: $url")
-                    try {
-                        startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
-                    } catch (e: Exception) {
-                        Log.e("WebViewClient", "Failed to open download url: $url", e)
-                    }
-                    return true
-                }
-                return false
-            }
-            // Delegate non-http(s) handling to legacy path for external schemes
-            Log.i("WebViewClient", "Override non-http(s): $url")
-            return shouldOverrideUrlLoading(view, url)
-        }
     }
 
-    inner class MyChromeClient : WebChromeClient() {
+    inner class MyChromeClient(private val activity: MainActivity) : WebChromeClient() {
         override fun onProgressChanged(view: WebView?, newProgress: Int) {
             super.onProgressChanged(view, newProgress)
             val url = view?.url
@@ -412,84 +382,53 @@ class MainActivity : AppCompatActivity() {
             super.onHideCustomView()
         }
 
-        override fun onCreateWindow(
-            view: WebView?,
-            isDialog: Boolean,
-            isUserGesture: Boolean,
-            resultMsg: android.os.Message?
+        // 处理文件选择（Android 5.0+）
+        override fun onShowFileChooser(
+            webView: WebView?,
+            filePathCallback: ValueCallback<Array<Uri>>?,
+            fileChooserParams: FileChooserParams?
         ): Boolean {
-            if (view == null || resultMsg == null) return false
-            Log.i("WebViewClient", "onCreateWindow gesture=$isUserGesture dialog=$isDialog")
-            val transport = resultMsg.obj as? WebViewTransport ?: return false
-            val childWebView = WebView(view.context)
-            childWebView.webViewClient = object : WebViewClient() {
-                override fun shouldOverrideUrlLoading(
-                    v: WebView?,
-                    request: WebResourceRequest?
-                ): Boolean {
-                    val rawUrl = request?.url?.toString() ?: return true
-                    val resolvedUrl = resolveUrl(view.url, rawUrl)
-                    Log.i("WebViewClient", "TargetBlank open external: $resolvedUrl")
-                    try {
-                        startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(resolvedUrl)))
-                    } catch (e: Exception) {
-                        Log.e("WebViewClient", "Failed to open target=_blank: $resolvedUrl", e)
-                    }
-                    return true
-                }
+            // 如果之前有未完成的回调，取消它
+            if (activity.fileUploadCallback != null) {
+                activity.fileUploadCallback?.onReceiveValue(null)
             }
-            transport.webView = childWebView
-            resultMsg.sendToTarget()
-            return true
-        }
-    }
+            activity.fileUploadCallback = filePathCallback
 
-    private fun isLikelyDownloadUrl(url: String): Boolean {
-        val normalized = url.lowercase(Locale.US)
-        if (normalized.contains("/downfile/") || normalized.contains("/download/")) {
-            return true
-        }
-        return normalized.endsWith(".apk") ||
-            normalized.endsWith(".zip") ||
-            normalized.endsWith(".rar") ||
-            normalized.endsWith(".7z") ||
-            normalized.endsWith(".pdf")
-    }
-
-    private fun resolveUrl(baseUrl: String?, targetUrl: String): String {
-        if (targetUrl.startsWith("http://") || targetUrl.startsWith("https://")) {
-            return targetUrl
-        }
-        return try {
-            if (baseUrl.isNullOrBlank()) {
-                targetUrl
-            } else {
-                URI(baseUrl).resolve(targetUrl).toString()
-            }
-        } catch (e: Exception) {
-            targetUrl
-        }
-    }
-
-    class JsBridge(private val context: Context) {
-        @JavascriptInterface
-        fun openBrowser(url: String?) {
-            openExternal(url, "openBrowser")
-        }
-
-        @JavascriptInterface
-        fun openOuter(url: String?) {
-            openExternal(url, "openOuter")
-        }
-
-        private fun openExternal(url: String?, source: String) {
-            if (url.isNullOrBlank()) return
-            val safeUrl = if (URLUtil.isNetworkUrl(url)) url else return
-            Log.i("WebViewClient", "JsBridge $source open external: $safeUrl")
             try {
-                context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(safeUrl)))
-            } catch (e: Exception) {
-                Log.e("WebViewClient", "JsBridge failed to open: $safeUrl", e)
+                val intent = Intent(Intent.ACTION_GET_CONTENT).apply {
+                    addCategory(Intent.CATEGORY_OPENABLE)
+                    
+                    // 根据参数设置文件类型
+                    val acceptTypes = fileChooserParams?.acceptTypes
+                    if (acceptTypes != null && acceptTypes.isNotEmpty()) {
+                        // 支持多种 MIME 类型
+                        if (acceptTypes.size == 1) {
+                            type = acceptTypes[0]
+                        } else {
+                            // 多个类型时使用通配符，并设置额外类型
+                            type = "*/*"
+                            putExtra(Intent.EXTRA_MIME_TYPES, acceptTypes)
+                        }
+                    } else {
+                        // 默认支持所有文件类型
+                        type = "*/*"
+                    }
+                    
+                    // 支持多选
+                    if (fileChooserParams?.mode == FileChooserParams.MODE_OPEN_MULTIPLE) {
+                        putExtra(Intent.EXTRA_ALLOW_MULTIPLE, true)
+                    }
+                }
+
+                // 创建选择器，允许用户选择不同的应用来打开文件
+                val chooserIntent = Intent.createChooser(intent, "选择文件")
+                activity.fileChooserLauncher.launch(chooserIntent)
+                return true
+            } catch (e: ActivityNotFoundException) {
+                Log.e("WebChromeClient", "无法打开文件选择器", e)
+                activity.fileUploadCallback?.onReceiveValue(null)
+                activity.fileUploadCallback = null
+                return false
             }
         }
     }
