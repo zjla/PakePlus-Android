@@ -91,7 +91,7 @@ class MainActivity : AppCompatActivity() {
         val fullScreen = config?.get("fullScreen") as? Boolean ?: false
         val debug = config?.get("debug") as? Boolean ?: false
         val userAgent = config?.get("userAgent") as? String ?: ""
-        val webUrl = config?.get("webUrl") as? String ?: "https://pakeplus.cn/"
+        val webUrl = config?.get("webUrl") as? String ?: "https://pakeplus.com/"
         // enable debug by chrome://inspect
         WebView.setWebContentsDebuggingEnabled(debug)
         // config fullscreen
@@ -284,6 +284,11 @@ class MainActivity : AppCompatActivity() {
         override fun shouldOverrideUrlLoading(view: WebView?, url: String?): Boolean {
             val url = url.toString()
 
+            // 检查是否是 HTTP/HTTPS URL，如果是则让 WebView 自己处理
+            if (url.startsWith("http://") || url.startsWith("https://") || url.startsWith("file://")) {
+                return false // 让 WebView 处理 HTTP/HTTPS/file 链接
+            }
+
             // --- 处理外部应用链接 ---
             // 1. 检查是否是 Intent URI (e.g., intent://...)
             if (url.startsWith("intent://")) {
@@ -316,7 +321,8 @@ class MainActivity : AppCompatActivity() {
                 // 或者继续执行下面的 Scheme 检查
             }
 
-            // 2. 检查是否是其他自定义 Scheme (e.g., weixin://, zhihu://)
+
+            // 3. 检查是否是其他自定义 Scheme (e.g., weixin://, zhihu://)
             // 注意：Intent URI 是更通用和推荐的方式，但有些应用可能直接使用 Scheme。
             try {
                 val intent = Intent(Intent.ACTION_VIEW, url.toUri())
