@@ -12,7 +12,9 @@ import android.util.Log
 import android.view.GestureDetector
 import android.view.MotionEvent
 import android.view.View
+import android.view.ViewGroup
 import android.view.WindowManager
+import android.widget.FrameLayout
 import android.webkit.ValueCallback
 import android.webkit.WebChromeClient
 import android.webkit.WebResourceError
@@ -51,6 +53,11 @@ class MainActivity : AppCompatActivity() {
     private lateinit var gestureDetector: GestureDetectorCompat
     private var fileUploadCallback: ValueCallback<Array<Uri>>? = null
     private lateinit var fileChooserLauncher: ActivityResultLauncher<Intent>
+    
+    // 全屏视频相关
+    private var customView: View? = null
+    private var customViewCallback: WebChromeClient.CustomViewCallback? = null
+    private var originalOrientation: Int = 0
 
     @SuppressLint("SetJavaScriptEnabled", "ClickableViewAccessibility")
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -234,12 +241,151 @@ class MainActivity : AppCompatActivity() {
     }
 
 
+    override fun onPause() {
+        super.onPause()
+        webView.onPause()
+        // 如果正在全屏播放视频，暂停播放
+        if (customView != null) {
+            webView.pauseTimers()
+        }
+    }
+
+    override fun onResume() {
+        super.onResume()
+        webView.onResume()
+        // 恢复 WebView 的定时器
+        webView.resumeTimers()
+    }
+
+    override fun onDestroy() {
+        // 清理全屏视图
+        if (customView != null) {
+            hideCustomView()
+        }
+        webView.destroy()
+        super.onDestroy()
+    }
+
     @Deprecated("Deprecated in Java")
     override fun onBackPressed() {
+        // 如果正在全屏播放视频，先退出全屏
+        if (customView != null) {
+            hideCustomView()
+            return
+        }
+        
         if (webView.canGoBack()) {
             webView.goBack()
         } else {
             super.onBackPressed()
+        }
+    }
+    
+    // 显示全屏视频
+    private fun showCustomView(view: View, callback: WebChromeClient.CustomViewCallback) {
+        // 如果已经有全屏视图，先隐藏它
+        if (customView != null) {
+            hideCustomView()
+            return
+        }
+        
+        customView = view
+        customViewCallback = callback
+        
+        // 保存当前屏幕方向
+        originalOrientation = requestedOrientation
+        
+        // 获取根布局
+        val decorView = window.decorView as ViewGroup
+        val rootView = decorView.findViewById<ViewGroup>(android.R.id.content)
+        
+        // 创建全屏容器
+        val fullscreenContainer = FrameLayout(this).apply {
+            layoutParams = ViewGroup.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.MATCH_PARENT
+            )
+            setBackgroundColor(android.graphics.Color.BLACK)
+        }
+        
+        // 将全屏视图添加到容器
+        fullscreenContainer.addView(view)
+        
+        // 将容器添加到根布局
+        rootView.addView(fullscreenContainer)
+        
+        // 隐藏系统UI
+        hideSystemUI()
+        
+        // 隐藏WebView
+        webView.visibility = View.GONE
+    }
+    
+    // 隐藏全屏视频
+    private fun hideCustomView() {
+        if (customView == null) return
+        
+        // 恢复系统UI
+        showSystemUI()
+        
+        // 显示WebView
+        webView.visibility = View.VISIBLE
+        
+        // 获取根布局
+        val decorView = window.decorView as ViewGroup
+        val rootView = decorView.findViewById<ViewGroup>(android.R.id.content)
+        
+        // 移除全屏容器
+        val fullscreenContainer = customView?.parent as? ViewGroup
+        fullscreenContainer?.let {
+            rootView.removeView(it)
+        }
+        
+        // 调用回调
+        customViewCallback?.onCustomViewHidden()
+        
+        // 清理
+        customView = null
+        customViewCallback = null
+        
+        // 恢复屏幕方向
+        requestedOrientation = originalOrientation
+    }
+    
+    // 隐藏系统UI（全屏模式）
+    private fun hideSystemUI() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            window.insetsController?.let {
+                it.hide(android.view.WindowInsets.Type.systemBars())
+                // 设置系统栏行为：通过滑动显示临时栏
+                try {
+                    @Suppress("NewApi")
+                    it.systemBarsBehavior = android.view.WindowInsetsController.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+                } catch (e: Exception) {
+                    // 如果常量不可用，忽略此设置
+                    Log.w("MainActivity", "BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE not available", e)
+                }
+            }
+        } else {
+            @Suppress("DEPRECATION")
+            window.decorView.systemUiVisibility = (
+                View.SYSTEM_UI_FLAG_FULLSCREEN
+                or View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
+                or View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY
+                or View.SYSTEM_UI_FLAG_LAYOUT_STABLE
+                or View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
+                or View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN
+            )
+        }
+    }
+    
+    // 显示系统UI
+    private fun showSystemUI() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            window.insetsController?.show(android.view.WindowInsets.Type.systemBars())
+        } else {
+            @Suppress("DEPRECATION")
+            window.decorView.systemUiVisibility = View.SYSTEM_UI_FLAG_VISIBLE
         }
     }
 
@@ -381,10 +527,15 @@ class MainActivity : AppCompatActivity() {
         }
 
         override fun onShowCustomView(view: View?, callback: CustomViewCallback?) {
-            super.onShowCustomView(view, callback)
+            if (view != null && callback != null) {
+                activity.showCustomView(view, callback)
+            } else {
+                super.onShowCustomView(view, callback)
+            }
         }
 
         override fun onHideCustomView() {
+            activity.hideCustomView()
             super.onHideCustomView()
         }
 
