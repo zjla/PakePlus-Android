@@ -15,12 +15,16 @@ import android.view.View
 import android.view.ViewGroup
 import android.view.WindowManager
 import android.widget.FrameLayout
+import android.webkit.URLUtil
 import android.webkit.ValueCallback
 import android.webkit.WebChromeClient
 import android.webkit.WebResourceError
 import android.webkit.WebResourceRequest
 import android.webkit.WebView
 import android.webkit.WebViewClient
+import android.app.DownloadManager
+import android.os.Environment
+import android.widget.Toast
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.ActivityResultLauncher
 import androidx.activity.result.contract.ActivityResultContracts
@@ -168,6 +172,22 @@ class MainActivity : AppCompatActivity() {
 
         // get web load progress
         webView.webChromeClient = MyChromeClient(this)
+
+        // 网页内下载：点击下载链接时由 DownloadManager 保存到系统下载目录
+        webView.setDownloadListener { url, userAgent, contentDisposition, mimetype, contentLength ->
+            val fileName = URLUtil.guessFileName(url, contentDisposition, mimetype)
+            val request = DownloadManager.Request(Uri.parse(url)).apply {
+                setMimeType(mimetype)
+                addRequestHeader("User-Agent", userAgent)
+                setDescription(getString(R.string.downloading))
+                setTitle(fileName)
+                setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
+                setDestinationInExternalPublicDir(Environment.DIRECTORY_DOWNLOADS, fileName)
+            }
+            val dm = getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager
+            dm.enqueue(request)
+            Toast.makeText(this, getString(R.string.download_started), Toast.LENGTH_SHORT).show()
+        }
 
         // Setup gesture detector
         gestureDetector =
