@@ -1,20 +1,24 @@
 package com.app.pakeplus
 
+import android.Manifest
 import android.annotation.SuppressLint
+import android.app.DownloadManager
 import android.content.ActivityNotFoundException
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.graphics.Bitmap
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
+import android.os.Environment
 import android.util.Log
 import android.view.GestureDetector
 import android.view.MotionEvent
 import android.view.View
 import android.view.ViewGroup
 import android.view.WindowManager
-import android.widget.FrameLayout
+import android.webkit.PermissionRequest
 import android.webkit.URLUtil
 import android.webkit.ValueCallback
 import android.webkit.WebChromeClient
@@ -22,8 +26,7 @@ import android.webkit.WebResourceError
 import android.webkit.WebResourceRequest
 import android.webkit.WebView
 import android.webkit.WebViewClient
-import android.app.DownloadManager
-import android.os.Environment
+import android.widget.FrameLayout
 import android.widget.Toast
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.ActivityResultLauncher
@@ -40,10 +43,11 @@ import androidx.activity.result.contract.ActivityResultContracts
 // import androidx.drawerlayout.widget.DrawerLayout
 // import com.app.pakeplus.databinding.ActivityMainBinding
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.content.ContextCompat
+import androidx.core.net.toUri
 import androidx.core.view.GestureDetectorCompat
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
-import androidx.core.net.toUri
 import org.json.JSONObject
 import java.net.URISyntaxException
 import kotlin.math.abs
@@ -57,6 +61,8 @@ class MainActivity : AppCompatActivity() {
     private lateinit var gestureDetector: GestureDetectorCompat
     private var fileUploadCallback: ValueCallback<Array<Uri>>? = null
     private lateinit var fileChooserLauncher: ActivityResultLauncher<Intent>
+    private lateinit var permissionLauncher: ActivityResultLauncher<Array<String>>
+    private var pendingPermissionRequest: PermissionRequest? = null
     
     // 全屏视频相关
     private var customView: View? = null
@@ -95,6 +101,25 @@ class MainActivity : AppCompatActivity() {
             
             fileUploadCallback?.onReceiveValue(results)
             fileUploadCallback = null
+        }
+
+        // 初始化运行时权限请求（摄像头 / 麦克风）
+        permissionLauncher = registerForActivityResult(
+            ActivityResultContracts.RequestMultiplePermissions()
+        ) { permissions ->
+            val request = pendingPermissionRequest
+            if (request == null) {
+                return@registerForActivityResult
+            }
+
+            // 所有相关权限都通过才允许 WebView 使用
+            val allGranted = permissions.values.all { it }
+            if (allGranted) {
+                request.grant(request.resources)
+            } else {
+                request.deny()
+            }
+            pendingPermissionRequest = null
         }
         
         // parseJsonWithNative
@@ -544,6 +569,52 @@ class MainActivity : AppCompatActivity() {
             super.onProgressChanged(view, newProgress)
             val url = view?.url
             println("wev view url:$url")
+        }
+
+        // 处理 getUserMedia 权限请求（摄像头 / 麦克风）
+        override fun onPermissionRequest(request: PermissionRequest?) {
+            if (request == null) return
+
+            activity.runOnUiThread {
+                val resources = request.resources
+
+                // 需要对应的原生权限
+                val needPermissions = mutableListOf<String>()
+                if (resources.contains(PermissionRequest.RESOURCE_VIDEO_CAPTURE)) {
+                    needPermissions.add(Manifest.permission.CAMERA)
+                }
+                if (resources.contains(PermissionRequest.RESOURCE_AUDIO_CAPTURE)) {
+                    needPermissions.add(Manifest.permission.RECORD_AUDIO)
+                }
+
+                if (needPermissions.isEmpty()) {
+                    // 不涉及摄像头/麦克风，直接允许
+                    request.grant(resources)
+                    return@runOnUiThread
+                }
+
+                // 检查是否已经有原生权限
+                val notGranted = needPermissions.filter {
+                    ContextCompat.checkSelfPermission(activity, it) != PackageManager.PERMISSION_GRANTED
+                }
+
+                if (notGranted.isEmpty()) {
+                    // 已经有权限，直接授予给 WebView
+                    request.grant(resources)
+                } else {
+                    // 先请求原生权限，保存 WebView 的请求
+                    activity.pendingPermissionRequest?.deny()
+                    activity.pendingPermissionRequest = request
+                    activity.permissionLauncher.launch(notGranted.toTypedArray())
+                }
+            }
+        }
+
+        override fun onPermissionRequestCanceled(request: PermissionRequest?) {
+            super.onPermissionRequestCanceled(request)
+            if (activity.pendingPermissionRequest == request) {
+                activity.pendingPermissionRequest = null
+            }
         }
 
         override fun onShowCustomView(view: View?, callback: CustomViewCallback?) {
