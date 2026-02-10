@@ -26,6 +26,7 @@ import android.webkit.WebResourceError
 import android.webkit.WebResourceRequest
 import android.webkit.WebView
 import android.webkit.WebViewClient
+import android.webkit.MimeTypeMap
 import android.widget.FrameLayout
 import android.widget.Toast
 import androidx.activity.enableEdgeToEdge
@@ -200,18 +201,7 @@ class MainActivity : AppCompatActivity() {
 
         // 网页内下载：点击下载链接时由 DownloadManager 保存到系统下载目录
         webView.setDownloadListener { url, userAgent, contentDisposition, mimetype, contentLength ->
-            val fileName = URLUtil.guessFileName(url, contentDisposition, mimetype)
-            val request = DownloadManager.Request(Uri.parse(url)).apply {
-                setMimeType(mimetype)
-                addRequestHeader("User-Agent", userAgent)
-                setDescription(getString(R.string.downloading))
-                setTitle(fileName)
-                setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
-                setDestinationInExternalPublicDir(Environment.DIRECTORY_DOWNLOADS, fileName)
-            }
-            val dm = getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager
-            dm.enqueue(request)
-            Toast.makeText(this, getString(R.string.download_started), Toast.LENGTH_SHORT).show()
+            startDownload(url, userAgent, contentDisposition, mimetype)
         }
 
         // Setup gesture detector
@@ -458,6 +448,75 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    /**
+     * 根据 URL / Content-Disposition / MIME 开始一个系统下载任务
+     * - 对常见的 mp4 纠正被识别成 .bin 的问题
+     * - 供 WebView DownloadListener 和 shouldOverrideUrlLoading 共用
+     */
+    private fun startDownload(
+        url: String,
+        userAgent: String?,
+        contentDisposition: String?,
+        mimetype: String?
+    ) {
+        // 1. 先根据 URL / Content-Disposition / MIME 推测文件名
+        var fileName = URLUtil.guessFileName(url, contentDisposition, mimetype)
+
+        // 2. 处理 mp4 被识别成 .bin 的场景
+        val lowerMime = mimetype?.lowercase() ?: ""
+        val lowerName = fileName.lowercase()
+
+        val isVideoMp4 = lowerMime.contains("video/mp4") ||
+                (lowerMime.contains("application/octet-stream") && url.contains(".mp4", ignoreCase = true))
+
+        if (isVideoMp4) {
+            fileName = when {
+                lowerName.endsWith(".mp4") -> fileName
+                lowerName.endsWith(".bin") -> fileName.replace(Regex("\\.bin$", RegexOption.IGNORE_CASE), ".mp4")
+                !fileName.contains('.') -> "$fileName.mp4"
+                else -> fileName
+            }
+        }
+
+        val request = DownloadManager.Request(Uri.parse(url)).apply {
+            // 对于 mp4 强制使用正确的 MIME，避免部分 ROM 再次误判
+            if (isVideoMp4) {
+                setMimeType("video/mp4")
+            } else if (!mimetype.isNullOrEmpty()) {
+                setMimeType(mimetype)
+            }
+
+            if (!userAgent.isNullOrEmpty()) {
+                addRequestHeader("User-Agent", userAgent)
+            }
+            setDescription(getString(R.string.downloading))
+            setTitle(fileName)
+            setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
+            setDestinationInExternalPublicDir(Environment.DIRECTORY_DOWNLOADS, fileName)
+        }
+
+        val dm = getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager
+        dm.enqueue(request)
+        Toast.makeText(this, getString(R.string.download_started), Toast.LENGTH_SHORT).show()
+    }
+
+    /**
+     * 判断一个 URL 是否是“常见文件类型”，用于自动触发下载
+     */
+    private fun isDownloadableFileUrl(url: String): Boolean {
+        val checkUrl = url.substringBefore("?").substringBefore("#").lowercase()
+        // 可按需要继续扩展
+        val exts = listOf(
+            "mp4", "mov", "mkv", "avi",
+            "mp3", "aac", "wav", "flac",
+            "jpg", "jpeg", "png", "gif", "webp", "bmp",
+            "txt", "pdf",
+            "doc", "docx", "xls", "xlsx", "ppt", "pptx",
+            "zip", "rar", "7z"
+        )
+        return exts.any { checkUrl.endsWith(".$it") }
+    }
+
 //    override fun onCreateOptionsMenu(menu: Menu): Boolean {
 //        // Inflate the menu; this adds items to the action bar if it is present.
 //        menuInflater.inflate(R.menu.main, menu)
@@ -473,19 +532,35 @@ class MainActivity : AppCompatActivity() {
 
         @Deprecated("Deprecated in Java", ReplaceWith("false"))
         override fun shouldOverrideUrlLoading(view: WebView?, url: String?): Boolean {
-            val url = url.toString()
+            if (url == null) return false
+            val fixedUrl = url.toString()
 
-            // 检查是否是 HTTP/HTTPS URL，如果是则让 WebView 自己处理
-            if (url.startsWith("http://") || url.startsWith("https://") || url.startsWith("file://")) {
-                return false // 让 WebView 处理 HTTP/HTTPS/file 链接
+            // 对常见文件类型的 HTTP/HTTPS 链接，直接拦截为下载，不在 WebView 内打开
+            if (fixedUrl.startsWith("http://") || fixedUrl.startsWith("https://")) {
+                if (isDownloadableFileUrl(fixedUrl)) {
+                    val ua = view?.settings?.userAgentString ?: ""
+                    // 根据扩展名推断 MIME
+                    val ext = MimeTypeMap.getFileExtensionFromUrl(fixedUrl)
+                    val mime = ext?.let { MimeTypeMap.getSingleton().getMimeTypeFromExtension(it.lowercase()) }
+                        ?: "application/octet-stream"
+                    this@MainActivity.startDownload(fixedUrl, ua, null, mime)
+                    return true
+                }
+                // 普通网页，交给 WebView 处理
+                return false
+            }
+
+            // file:// 链接仍交给 WebView 处理
+            if (fixedUrl.startsWith("file://")) {
+                return false
             }
 
             // --- 处理外部应用链接 ---
             // 1. 检查是否是 Intent URI (e.g., intent://...)
-            if (url.startsWith("intent://")) {
+            if (fixedUrl.startsWith("intent://")) {
                 try {
                     // 解析 Intent URI
-                    val intent = Intent.parseUri(url, Intent.URI_INTENT_SCHEME)
+                    val intent = Intent.parseUri(fixedUrl, Intent.URI_INTENT_SCHEME)
 
                     // 检查设备上是否有应用可以处理此 Intent
                     if (intent.resolveActivity(view?.context?.packageManager!!) != null) {
@@ -502,10 +577,10 @@ class MainActivity : AppCompatActivity() {
 
                 } catch (e: URISyntaxException) {
                     // 解析 Intent URI 失败
-                    Log.e("WebViewClient", "Bad Intent URI: $url", e)
+                    Log.e("WebViewClient", "Bad Intent URI: $fixedUrl", e)
                 } catch (e: ActivityNotFoundException) {
                     // 找不到匹配的 Activity (外部应用未安装)，此情况通常在 `resolveActivity` 后捕获
-                    Log.e("WebViewClient", "No activity found to handle Intent: $url", e)
+                    Log.e("WebViewClient", "No activity found to handle Intent: $fixedUrl", e)
                     // 您也可以在这里加载一个 "未安装应用" 的提示页面
                 }
                 // 如果是 Intent 但无法处理（例如未安装应用），您可以选择返回 false 让 WebView 尝试加载（通常会失败）
@@ -516,18 +591,18 @@ class MainActivity : AppCompatActivity() {
             // 3. 检查是否是其他自定义 Scheme (e.g., weixin://, zhihu://)
             // 注意：Intent URI 是更通用和推荐的方式，但有些应用可能直接使用 Scheme。
             try {
-                val intent = Intent(Intent.ACTION_VIEW, url.toUri())
+                val intent = Intent(Intent.ACTION_VIEW, fixedUrl.toUri())
                 // 必须检查是否有应用可以处理此 Intent，否则会导致崩溃
                 if (intent.resolveActivity(view?.context?.packageManager!!) != null) {
                     view.context?.startActivity(intent)
                     return true // 已经处理，阻止 WebView 加载
                 } else {
                     // 没有安装相应的应用
-                    Log.w("WebViewClient", "External app not installed for: $url")
+                    Log.w("WebViewClient", "External app not installed for: $fixedUrl")
                     // 可以添加逻辑提示用户下载应用或打开相应的应用商店链接
                 }
             } catch (e: Exception) {
-                Log.e("WebViewClient", "Error starting external app: $url", e)
+                Log.e("WebViewClient", "Error starting external app: $fixedUrl", e)
             }
             // 如果不是外部应用 Scheme，也不是 HTTP/HTTPS，则返回 false，让 WebView 处理
             return false
