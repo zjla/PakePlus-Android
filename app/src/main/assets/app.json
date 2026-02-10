@@ -4,7 +4,7 @@
     "description": "A sample mobile application by PakePlus",
     "author": "1024coder",
     "webUrl": "https://pphtml.pages.dev/",
-    "debug": true,
+    "debug": false,
     "userAgent": "",
     "fullScreen": false,
     "videoFull": false,
