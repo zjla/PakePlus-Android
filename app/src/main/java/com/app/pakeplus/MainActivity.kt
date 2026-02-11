@@ -18,7 +18,9 @@ import android.view.MotionEvent
 import android.view.View
 import android.view.ViewGroup
 import android.view.WindowManager
+import android.view.Gravity
 import android.webkit.PermissionRequest
+import android.webkit.JavascriptInterface
 import android.webkit.URLUtil
 import android.webkit.ValueCallback
 import android.webkit.WebChromeClient
@@ -51,6 +53,9 @@ import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import org.json.JSONObject
 import java.net.URISyntaxException
+import android.util.Base64
+import java.io.File
+import java.io.FileOutputStream
 import kotlin.math.abs
 
 class MainActivity : AppCompatActivity() {
@@ -64,7 +69,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var fileChooserLauncher: ActivityResultLauncher<Intent>
     private lateinit var permissionLauncher: ActivityResultLauncher<Array<String>>
     private var pendingPermissionRequest: PermissionRequest? = null
-    
+
     // 全屏视频相关
     private var customView: View? = null
     private var customViewCallback: WebChromeClient.CustomViewCallback? = null
@@ -73,22 +78,22 @@ class MainActivity : AppCompatActivity() {
     @SuppressLint("SetJavaScriptEnabled", "ClickableViewAccessibility")
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        
+
         // 初始化文件选择器
         fileChooserLauncher = registerForActivityResult(
             ActivityResultContracts.StartActivityForResult()
         ) { result ->
             val resultCode = result.resultCode
             val data = result.data
-            
+
             if (fileUploadCallback == null) return@registerForActivityResult
-            
+
             var results: Array<Uri>? = null
-            
+
             if (resultCode == RESULT_OK && data != null) {
                 val dataString = data.dataString
                 val clipData = data.clipData
-                
+
                 if (clipData != null) {
                     // 多文件选择
                     results = Array(clipData.itemCount) { i ->
@@ -99,7 +104,7 @@ class MainActivity : AppCompatActivity() {
                     results = arrayOf(Uri.parse(dataString))
                 }
             }
-            
+
             fileUploadCallback?.onReceiveValue(results)
             fileUploadCallback = null
         }
@@ -122,7 +127,7 @@ class MainActivity : AppCompatActivity() {
             }
             pendingPermissionRequest = null
         }
-        
+
         // parseJsonWithNative
         val config = parseJsonWithNative(this, "app.json")
         val fullScreen = config?.get("fullScreen") as? Boolean ?: false
@@ -192,6 +197,9 @@ class MainActivity : AppCompatActivity() {
 
         // clear cache
         webView.clearCache(true)
+
+        // 为 blob: 链接下载注入 JS 接口
+        webView.addJavascriptInterface(BlobDownloadInterface(this), "BlobDownloader")
 
         // inject js
         webView.webViewClient = MyWebViewClient(debug)
@@ -308,14 +316,14 @@ class MainActivity : AppCompatActivity() {
             hideCustomView()
             return
         }
-        
+
         if (webView.canGoBack()) {
             webView.goBack()
         } else {
             super.onBackPressed()
         }
     }
-    
+
     // 显示全屏视频
     private fun showCustomView(view: View, callback: WebChromeClient.CustomViewCallback) {
         // 如果已经有全屏视图，先隐藏它
@@ -323,17 +331,17 @@ class MainActivity : AppCompatActivity() {
             hideCustomView()
             return
         }
-        
+
         customView = view
         customViewCallback = callback
-        
+
         // 保存当前屏幕方向
         originalOrientation = requestedOrientation
-        
+
         // 获取根布局
         val decorView = window.decorView as ViewGroup
         val rootView = decorView.findViewById<ViewGroup>(android.R.id.content)
-        
+
         // 创建全屏容器
         val fullscreenContainer = FrameLayout(this).apply {
             layoutParams = ViewGroup.LayoutParams(
@@ -342,51 +350,51 @@ class MainActivity : AppCompatActivity() {
             )
             setBackgroundColor(android.graphics.Color.BLACK)
         }
-        
+
         // 将全屏视图添加到容器
         fullscreenContainer.addView(view)
-        
+
         // 将容器添加到根布局
         rootView.addView(fullscreenContainer)
-        
+
         // 隐藏系统UI
         hideSystemUI()
-        
+
         // 隐藏WebView
         webView.visibility = View.GONE
     }
-    
+
     // 隐藏全屏视频
     private fun hideCustomView() {
         if (customView == null) return
-        
+
         // 恢复系统UI
         showSystemUI()
-        
+
         // 显示WebView
         webView.visibility = View.VISIBLE
-        
+
         // 获取根布局
         val decorView = window.decorView as ViewGroup
         val rootView = decorView.findViewById<ViewGroup>(android.R.id.content)
-        
+
         // 移除全屏容器
         val fullscreenContainer = customView?.parent as? ViewGroup
         fullscreenContainer?.let {
             rootView.removeView(it)
         }
-        
+
         // 调用回调
         customViewCallback?.onCustomViewHidden()
-        
+
         // 清理
         customView = null
         customViewCallback = null
-        
+
         // 恢复屏幕方向
         requestedOrientation = originalOrientation
     }
-    
+
     // 隐藏系统UI（全屏模式）
     private fun hideSystemUI() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
@@ -395,7 +403,8 @@ class MainActivity : AppCompatActivity() {
                 // 设置系统栏行为：通过滑动显示临时栏
                 try {
                     @Suppress("NewApi")
-                    it.systemBarsBehavior = android.view.WindowInsetsController.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+                    it.systemBarsBehavior =
+                        android.view.WindowInsetsController.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
                 } catch (e: Exception) {
                     // 如果常量不可用，忽略此设置
                     Log.w("MainActivity", "BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE not available", e)
@@ -404,16 +413,16 @@ class MainActivity : AppCompatActivity() {
         } else {
             @Suppress("DEPRECATION")
             window.decorView.systemUiVisibility = (
-                View.SYSTEM_UI_FLAG_FULLSCREEN
-                or View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
-                or View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY
-                or View.SYSTEM_UI_FLAG_LAYOUT_STABLE
-                or View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
-                or View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN
-            )
+                    View.SYSTEM_UI_FLAG_FULLSCREEN
+                            or View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
+                            or View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY
+                            or View.SYSTEM_UI_FLAG_LAYOUT_STABLE
+                            or View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
+                            or View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN
+                    )
         }
     }
-    
+
     // 显示系统UI
     private fun showSystemUI() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
@@ -449,6 +458,46 @@ class MainActivity : AppCompatActivity() {
     }
 
     /**
+     * JS 调用的接口：接收 base64 数据并保存为文件
+     */
+    inner class BlobDownloadInterface(private val context: Context) {
+
+        @JavascriptInterface
+        fun downloadBase64File(base64Data: String, mimeType: String?, fileName: String?) {
+            try {
+                val bytes = Base64.decode(base64Data, Base64.DEFAULT)
+
+                // 统一保存到系统 Download 目录，和普通下载保持一致
+                val downloadsDir =
+                    Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
+                if (!downloadsDir.exists()) {
+                    downloadsDir.mkdirs()
+                }
+
+                val safeName = when {
+                    !fileName.isNullOrBlank() -> fileName
+                    !mimeType.isNullOrBlank() -> {
+                        val ext = MimeTypeMap.getSingleton()
+                            .getExtensionFromMimeType(mimeType) ?: "bin"
+                        "download_${System.currentTimeMillis()}.$ext"
+                    }
+
+                    else -> "download_${System.currentTimeMillis()}.bin"
+                }
+
+                val outFile = File(downloadsDir, safeName)
+                FileOutputStream(outFile).use { it.write(bytes) }
+
+                showTopToast(context, "已保存到下载目录: ${outFile.name}", Toast.LENGTH_LONG)
+                Log.d("BlobDownload", "File saved: ${outFile.absolutePath}")
+            } catch (e: Exception) {
+                Log.e("BlobDownload", "save error", e)
+                showTopToast(context, "保存失败: ${e.message}", Toast.LENGTH_LONG)
+            }
+        }
+    }
+
+    /**
      * 根据 URL / Content-Disposition / MIME 开始一个系统下载任务
      * - 对常见的 mp4 纠正被识别成 .bin 的问题
      * - 供 WebView DownloadListener 和 shouldOverrideUrlLoading 共用
@@ -467,12 +516,21 @@ class MainActivity : AppCompatActivity() {
         val lowerName = fileName.lowercase()
 
         val isVideoMp4 = lowerMime.contains("video/mp4") ||
-                (lowerMime.contains("application/octet-stream") && url.contains(".mp4", ignoreCase = true))
+                (lowerMime.contains("application/octet-stream") && url.contains(
+                    ".mp4",
+                    ignoreCase = true
+                ))
 
         if (isVideoMp4) {
             fileName = when {
                 lowerName.endsWith(".mp4") -> fileName
-                lowerName.endsWith(".bin") -> fileName.replace(Regex("\\.bin$", RegexOption.IGNORE_CASE), ".mp4")
+                lowerName.endsWith(".bin") -> fileName.replace(
+                    Regex(
+                        "\\.bin$",
+                        RegexOption.IGNORE_CASE
+                    ), ".mp4"
+                )
+
                 !fileName.contains('.') -> "$fileName.mp4"
                 else -> fileName
             }
@@ -497,7 +555,16 @@ class MainActivity : AppCompatActivity() {
 
         val dm = getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager
         dm.enqueue(request)
-        Toast.makeText(this, getString(R.string.download_started), Toast.LENGTH_SHORT).show()
+        showTopToast(this, getString(R.string.download_started), Toast.LENGTH_SHORT)
+    }
+
+    /**
+     * 将 Toast 显示在屏幕顶部
+     */
+    private fun showTopToast(context: Context, message: String, duration: Int) {
+        val toast = Toast.makeText(context, message, duration)
+        toast.setGravity(Gravity.TOP or Gravity.CENTER_HORIZONTAL, 0, 120)
+        toast.show()
     }
 
     /**
@@ -541,7 +608,9 @@ class MainActivity : AppCompatActivity() {
                     val ua = view?.settings?.userAgentString ?: ""
                     // 根据扩展名推断 MIME
                     val ext = MimeTypeMap.getFileExtensionFromUrl(fixedUrl)
-                    val mime = ext?.let { MimeTypeMap.getSingleton().getMimeTypeFromExtension(it.lowercase()) }
+                    val mime = ext?.let {
+                        MimeTypeMap.getSingleton().getMimeTypeFromExtension(it.lowercase())
+                    }
                         ?: "application/octet-stream"
                     this@MainActivity.startDownload(fixedUrl, ua, null, mime)
                     return true
@@ -623,6 +692,63 @@ class MainActivity : AppCompatActivity() {
 
         override fun onPageFinished(view: WebView?, url: String?) {
             super.onPageFinished(view, url)
+            // 注入脚本，拦截 blob: 链接并通过 BlobDownloader 保存到本地
+            val blobInterceptor = """
+                (function () {
+                  if (window.__blobDownloadInjected) return;
+                  window.__blobDownloadInjected = true;
+                  
+                  document.addEventListener('click', function (e) {
+                    try {
+                      var target = e.target;
+                      // 寻找最近的 <a> 标签
+                      while (target && target.tagName && target.tagName.toLowerCase() !== 'a') {
+                        target = target.parentElement;
+                      }
+                      if (!target) return;
+                      
+                      var href = target.getAttribute('href');
+                      if (!href || href.indexOf('blob:') !== 0) return;
+                      
+                      // 拦截浏览器默认行为
+                      e.preventDefault();
+                      e.stopPropagation();
+                      
+                      var fileName = target.getAttribute('download') || 'download-' + Date.now();
+                      
+                      // 通过 fetch 拿到 blob，再转 base64 交给原生
+                      fetch(href)
+                        .then(function (res) { return res.blob(); })
+                        .then(function (blob) {
+                          var reader = new FileReader();
+                          reader.onloadend = function () {
+                            try {
+                              var dataUrl = reader.result || '';
+                              var commaIndex = dataUrl.indexOf(',');
+                              var base64 = commaIndex >= 0 ? dataUrl.substring(commaIndex + 1) : dataUrl;
+                              var mime = blob.type || 'application/octet-stream';
+                              if (window.BlobDownloader && window.BlobDownloader.downloadBase64File) {
+                                window.BlobDownloader.downloadBase64File(base64, mime, fileName);
+                              } else {
+                                console.error('BlobDownloader not found on window');
+                              }
+                            } catch (err) {
+                              console.error('Blob download convert error', err);
+                            }
+                          };
+                          reader.readAsDataURL(blob);
+                        })
+                        .catch(function (err) {
+                          console.error('Blob download fetch error', err);
+                        });
+                    } catch (e2) {
+                      console.error('Blob download interceptor error', e2);
+                    }
+                  }, true);
+                })();
+            """.trimIndent()
+
+            view?.evaluateJavascript(blobInterceptor, null)
         }
 
         override fun onPageStarted(view: WebView?, url: String?, favicon: Bitmap?) {
@@ -670,7 +796,10 @@ class MainActivity : AppCompatActivity() {
 
                 // 检查是否已经有原生权限
                 val notGranted = needPermissions.filter {
-                    ContextCompat.checkSelfPermission(activity, it) != PackageManager.PERMISSION_GRANTED
+                    ContextCompat.checkSelfPermission(
+                        activity,
+                        it
+                    ) != PackageManager.PERMISSION_GRANTED
                 }
 
                 if (notGranted.isEmpty()) {
@@ -720,7 +849,7 @@ class MainActivity : AppCompatActivity() {
             try {
                 val intent = Intent(Intent.ACTION_GET_CONTENT).apply {
                     addCategory(Intent.CATEGORY_OPENABLE)
-                    
+
                     // 根据参数设置文件类型
                     val acceptTypes = fileChooserParams?.acceptTypes
                     if (acceptTypes != null && acceptTypes.isNotEmpty()) {
@@ -736,7 +865,7 @@ class MainActivity : AppCompatActivity() {
                         // 默认支持所有文件类型
                         type = "*/*"
                     }
-                    
+
                     // 支持多选
                     if (fileChooserParams?.mode == FileChooserParams.MODE_OPEN_MULTIPLE) {
                         putExtra(Intent.EXTRA_ALLOW_MULTIPLE, true)
