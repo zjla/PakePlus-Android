@@ -177,7 +177,7 @@ class MainActivity : AppCompatActivity() {
         ViewCompat.setOnApplyWindowInsetsListener(findViewById(R.id.ConstraintLayout))
         { view, insets ->
             val systemBar = insets.getInsets(WindowInsetsCompat.Type.systemBars())
-            view.setPadding(systemBar.left, systemBar.top, systemBar.right, 0)
+            view.setPadding(systemBar.left, systemBar.top, systemBar.right, systemBar.bottom)
             insets
         }
         // 全屏模式下隐藏状态栏和底部导航栏（Android 9+ 必须在这里调用，window 已就绪）
