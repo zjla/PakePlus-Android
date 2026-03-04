@@ -75,6 +75,9 @@ class MainActivity : AppCompatActivity() {
     private var customViewCallback: WebChromeClient.CustomViewCallback? = null
     private var originalOrientation: Int = 0
 
+    /** 是否从配置启用了全屏（隐藏状态栏+导航栏） */
+    private var isFullScreenMode: Boolean = false
+
     @SuppressLint("SetJavaScriptEnabled", "ClickableViewAccessibility")
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -137,6 +140,7 @@ class MainActivity : AppCompatActivity() {
         // enable debug by chrome://inspect
         WebView.setWebContentsDebuggingEnabled(debug)
         // config fullscreen
+        isFullScreenMode = fullScreen
         if (fullScreen) {
             window.setFlags(
                 WindowManager.LayoutParams.FLAG_FULLSCREEN,
@@ -152,7 +156,10 @@ class MainActivity : AppCompatActivity() {
                 lp.layoutInDisplayCutoutMode =
                     WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES
                 window.attributes = lp
-            } else {
+            }
+            // 低于 P 时在这里用旧 API 隐藏导航栏；P 及以上在 setContentView 后由 hideSystemUI() 统一处理
+            if (Build.VERSION.SDK_INT < Build.VERSION_CODES.P) {
+                @Suppress("DEPRECATION")
                 window.decorView.systemUiVisibility = (
                         View.SYSTEM_UI_FLAG_FULLSCREEN or
                                 View.SYSTEM_UI_FLAG_HIDE_NAVIGATION or
@@ -172,6 +179,10 @@ class MainActivity : AppCompatActivity() {
             val systemBar = insets.getInsets(WindowInsetsCompat.Type.systemBars())
             view.setPadding(systemBar.left, systemBar.top, systemBar.right, 0)
             insets
+        }
+        // 全屏模式下隐藏状态栏和底部导航栏（Android 9+ 必须在这里调用，window 已就绪）
+        if (isFullScreenMode) {
+            window.decorView.post { hideSystemUI() }
         }
         webView = findViewById<WebView>(R.id.webview)
         webView.settings.apply {
@@ -298,6 +309,14 @@ class MainActivity : AppCompatActivity() {
         webView.onResume()
         // 恢复 WebView 的定时器
         webView.resumeTimers()
+    }
+
+    override fun onWindowFocusChanged(hasFocus: Boolean) {
+        super.onWindowFocusChanged(hasFocus)
+        // 全屏模式下窗口重新获得焦点时再次隐藏导航栏（用户从边缘滑出后会自动再隐藏）
+        if (hasFocus && isFullScreenMode && customView == null) {
+            hideSystemUI()
+        }
     }
 
     override fun onDestroy() {
