@@ -15,5 +15,6 @@
     "gallery": false,
     "wechat": false,
     "douyin": false,
-    "browser": false
+    "browser": false,
+    "gesture": false
 }
