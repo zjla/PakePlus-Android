@@ -134,6 +134,7 @@ class MainActivity : AppCompatActivity() {
         // parseJsonWithNative
         val config = parseJsonWithNative(this, "app.json")
         val fullScreen = config?.get("fullScreen") as? Boolean ?: false
+        val gesture = config?.get("gesture") as? Boolean ?: false
         val debug = config?.get("debug") as? Boolean ?: false
         val userAgent = config?.get("userAgent") as? String ?: ""
         val webUrl = config?.get("webUrl") as? String ?: "https://pakeplus.com/"
@@ -261,7 +262,9 @@ class MainActivity : AppCompatActivity() {
 
         // Set touch listener for WebView
         webView.setOnTouchListener { _, event ->
-            gestureDetector.onTouchEvent(event)
+            if (gesture) {
+                gestureDetector.onTouchEvent(event)
+            }
             false
         }
 
