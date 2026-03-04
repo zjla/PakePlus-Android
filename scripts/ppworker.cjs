@@ -234,7 +234,7 @@ const setGithubEnv = (name, version, pubBody) => {
 }
 
 // update android applicationId
-const updateAndroidId = async (id) => {
+const upAppIdVersion = async (id, version) => {
     const gradlePath = path.join(__dirname, '../app/build.gradle.kts')
     const exists = await fs.pathExists(gradlePath)
     if (!exists) {
@@ -246,18 +246,20 @@ const updateAndroidId = async (id) => {
     let content = await fs.readFile(gradlePath, 'utf8')
 
     // Replace the applicationId
-    const updatedContent = content.replace(
+    content = content.replace(
         /applicationId = ".*?"/,
         `applicationId = "${id}"`
     )
 
+    // Replace the versionName
+    content = content.replace(
+        /versionName = ".*?"/,
+        `versionName = "${version}"`
+    )
+
     // Write back only if changes were made
-    if (updatedContent !== content) {
-        await fs.writeFile(gradlePath, updatedContent)
-        console.log(`✅ Updated applicationId to: ${id}`)
-    } else {
-        console.log('ℹ️ No changes needed in build.gradle.kts')
-    }
+    await fs.writeFile(gradlePath, content)
+    console.log(`✅ Updated Id: ${id} and version: ${version}`)
 }
 
 // copy html to android res dir
@@ -350,7 +352,7 @@ const main = async () => {
     await fs.remove(outPath)
 
     // update android applicationId
-    await updateAndroidId(id)
+    await upAppIdVersion(id, version)
 
     // set github env
     setGithubEnv(name, version, pubBody)
