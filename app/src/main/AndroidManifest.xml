@@ -39,6 +39,7 @@
         <package android:name="com.eg.android.AlipayGphone" />
         <package android:name="com.taobao.taobao" />
         <package android:name="com.jingdong.app.mall" />
+        
 
         <!-- 浏览器/地图/其他 -->
         <package android:name="com.android.chrome" />
