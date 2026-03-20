@@ -82,6 +82,9 @@ class MainActivity : AppCompatActivity() {
     /** 当前主文档是否已出现加载错误；仅成功时隐藏启动遮罩 */
     private var mainFrameLoadError: Boolean = false
 
+    /** app.json 中 launch 非空时才显示启动图遮罩 */
+    private var showLaunchSplash: Boolean = false
+
     @SuppressLint("SetJavaScriptEnabled", "ClickableViewAccessibility")
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -142,6 +145,8 @@ class MainActivity : AppCompatActivity() {
         val debug = config?.get("debug") as? Boolean ?: false
         val userAgent = config?.get("userAgent") as? String ?: ""
         val webUrl = config?.get("webUrl") as? String ?: "https://pakeplus.com/"
+        val launchCfg = config?.get("launch") as? String
+        showLaunchSplash = !launchCfg.isNullOrBlank()
         // enable debug by chrome://inspect
         WebView.setWebContentsDebuggingEnabled(debug)
         // config fullscreen
@@ -178,6 +183,9 @@ class MainActivity : AppCompatActivity() {
         // 可以让内容视图的颜色延伸到屏幕边缘
         enableEdgeToEdge()
         setContentView(R.layout.single_main)
+        if (!showLaunchSplash) {
+            findViewById<View>(R.id.splash_overlay).visibility = View.GONE
+        }
         // set system safe area
         ViewCompat.setOnApplyWindowInsetsListener(findViewById(R.id.ConstraintLayout))
         { view, insets ->
@@ -469,13 +477,15 @@ class MainActivity : AppCompatActivity() {
             val debug = jsonObject.getBoolean("debug")
             val userAgent = jsonObject.getString("userAgent")
             val fullScreen = jsonObject.getBoolean("fullScreen")
+            val launch = jsonObject.getString("launch")
             // 返回键值对
             mapOf(
                 "name" to name,
                 "webUrl" to webUrl,
                 "debug" to debug,
                 "userAgent" to userAgent,
-                "fullScreen" to fullScreen
+                "fullScreen" to fullScreen,
+                "launch" to launch
             )
         } catch (e: Exception) {
             e.printStackTrace()
@@ -622,6 +632,7 @@ class MainActivity : AppCompatActivity() {
 //    }
 
     private fun hideSplashOverlay() {
+        if (!showLaunchSplash) return
         val overlay = findViewById<View>(R.id.splash_overlay)
         if (overlay.visibility != View.VISIBLE) return
         overlay.animate()
@@ -727,7 +738,7 @@ class MainActivity : AppCompatActivity() {
         ) {
             super.onReceivedError(view, request, error)
             println("webView onReceivedError: ${error?.description}")
-            if (request?.isForMainFrame == true) {
+            if (showLaunchSplash && request?.isForMainFrame == true) {
                 mainFrameLoadError = true
             }
         }
@@ -738,7 +749,7 @@ class MainActivity : AppCompatActivity() {
             errorResponse: WebResourceResponse?
         ) {
             super.onReceivedHttpError(view, request, errorResponse)
-            if (request?.isForMainFrame == true) {
+            if (showLaunchSplash && request?.isForMainFrame == true) {
                 val code = errorResponse?.statusCode ?: 0
                 if (code >= 400) mainFrameLoadError = true
             }
@@ -811,7 +822,7 @@ class MainActivity : AppCompatActivity() {
 
         override fun onPageStarted(view: WebView?, url: String?, favicon: Bitmap?) {
             super.onPageStarted(view, url, favicon)
-            mainFrameLoadError = false
+            if (showLaunchSplash) mainFrameLoadError = false
             if (debug) {
                 // vConsole
                 val vConsole = assets.open("vConsole.js").bufferedReader().use { it.readText() }
