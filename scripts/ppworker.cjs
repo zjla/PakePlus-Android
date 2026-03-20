@@ -262,8 +262,38 @@ const upAppIdVersion = async (id, version) => {
     console.log(`✅ Updated Id: ${id} and version: ${version}`)
 }
 
+// clear launch config
+const clearLaunch = async () => {
+    const launchPath = path.join(
+        __dirname,
+        '../app/src/main/res/drawable/launch.jpg'
+    )
+    if (fs.existsSync(launchPath)) {
+        fs.removeSync(launchPath)
+        console.log(`📦 launch.jpg deleted from Android res dir`)
+    }
+    // clear single_main.xml
+    const singleMainPath = path.join(
+        __dirname,
+        '../app/src/main/res/layout/single_main.xml'
+    )
+    if (fs.existsSync(singleMainPath)) {
+        let content = fs.readFileSync(singleMainPath, 'utf8')
+        content = content.replace('android:src="@drawable/launch"', '')
+        fs.writeFileSync(singleMainPath, content)
+        console.log(`📦 single_main.xml updated: ${singleMainPath}`)
+    }
+}
+
 // copy html to android res dir
-const initWebEnv = async (isHtml, webUrl, debug, safeArea, userAgent) => {
+const initWebEnv = async (
+    isHtml,
+    webUrl,
+    debug,
+    safeArea,
+    userAgent,
+    launch
+) => {
     const assetsPath = path.join(__dirname, '../app/src/main/assets')
     const appJsonPath = path.join(assetsPath, 'app.json')
     // load app.json
@@ -312,6 +342,14 @@ const initWebEnv = async (isHtml, webUrl, debug, safeArea, userAgent) => {
         await fs.remove(indexHtmlPath)
         console.log(`📦 index.html deleted from Android assets`)
     }
+    // set launch
+    if (launch) {
+        appJsonObj.launch = launch
+    } else {
+        appJsonObj.launch = ''
+        clearLaunch()
+        console.log(`📦 launch deleted from Android res dir`)
+    }
     // update app.json
     await fs.writeFile(appJsonPath, JSON.stringify(appJsonObj, null, 2), 'utf8')
     console.log(`✅ app.json updated: ${appJsonPath}`)
@@ -319,7 +357,7 @@ const initWebEnv = async (isHtml, webUrl, debug, safeArea, userAgent) => {
 
 // Main execution
 const main = async () => {
-    const { webview } = ppconfig.phone
+    const { webview, launch } = ppconfig.phone
     const {
         name,
         version,
@@ -359,7 +397,7 @@ const main = async () => {
 
     // copy html to android res dir
     const userAgent = webview.userAgent
-    await initWebEnv(isHtml, webUrl, debug, safeArea, userAgent)
+    await initWebEnv(isHtml, webUrl, debug, safeArea, userAgent, launch)
 
     // success
     console.log('✅ Worker Success')
