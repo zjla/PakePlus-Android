@@ -6,7 +6,7 @@
     "webUrl": "https://pphtml.pages.dev/",
     "debug": false,
     "userAgent": "",
-    "fullScreen": true,
+    "fullScreen": false,
     "videoFull": false,
     "download": false,
     "upload": false,
@@ -16,5 +16,6 @@
     "wechat": false,
     "douyin": false,
     "browser": false,
-    "gesture": false
+    "gesture": false,
+    "launch": ""
 }

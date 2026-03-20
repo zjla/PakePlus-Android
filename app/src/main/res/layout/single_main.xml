@@ -11,17 +11,25 @@
         android:layout_width="match_parent"
         android:layout_height="match_parent" />
 
-    <!-- WebView 加载完成前覆盖在上面，避免白屏 / 半成品页面 -->
+    <!-- WebView 加载完成前覆盖在上面 -->
     <FrameLayout
         android:id="@+id/splash_overlay"
         android:layout_width="0dp"
         android:layout_height="0dp"
-        android:background="@drawable/splash_launch"
         android:clickable="true"
         android:elevation="8dp"
         android:focusable="true"
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toTopOf="parent" />
+        app:layout_constraintTop_toTopOf="parent">
+
+        <ImageView
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:contentDescription="@null"
+            android:importantForAccessibility="no"
+            android:scaleType="centerCrop"
+            android:src="@drawable/launch" />
+    </FrameLayout>
 </androidx.constraintlayout.widget.ConstraintLayout>
