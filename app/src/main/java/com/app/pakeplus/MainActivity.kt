@@ -26,6 +26,7 @@ import android.webkit.ValueCallback
 import android.webkit.WebChromeClient
 import android.webkit.WebResourceError
 import android.webkit.WebResourceRequest
+import android.webkit.WebResourceResponse
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import android.webkit.MimeTypeMap
@@ -77,6 +78,9 @@ class MainActivity : AppCompatActivity() {
 
     /** 是否从配置启用了全屏（隐藏状态栏+导航栏） */
     private var isFullScreenMode: Boolean = false
+
+    /** 当前主文档是否已出现加载错误；仅成功时隐藏启动遮罩 */
+    private var mainFrameLoadError: Boolean = false
 
     @SuppressLint("SetJavaScriptEnabled", "ClickableViewAccessibility")
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -617,6 +621,19 @@ class MainActivity : AppCompatActivity() {
 //        return navController.navigateUp(appBarConfiguration) || super.onSupportNavigateUp()
 //    }
 
+    private fun hideSplashOverlay() {
+        val overlay = findViewById<View>(R.id.splash_overlay)
+        if (overlay.visibility != View.VISIBLE) return
+        overlay.animate()
+            .alpha(0f)
+            .setDuration(200L)
+            .withEndAction {
+                overlay.visibility = View.GONE
+                overlay.alpha = 1f
+            }
+            .start()
+    }
+
     inner class MyWebViewClient(val debug: Boolean) : WebViewClient() {
 
         @Deprecated("Deprecated in Java", ReplaceWith("false"))
@@ -710,10 +727,29 @@ class MainActivity : AppCompatActivity() {
         ) {
             super.onReceivedError(view, request, error)
             println("webView onReceivedError: ${error?.description}")
+            if (request?.isForMainFrame == true) {
+                mainFrameLoadError = true
+            }
+        }
+
+        override fun onReceivedHttpError(
+            view: WebView?,
+            request: WebResourceRequest?,
+            errorResponse: WebResourceResponse?
+        ) {
+            super.onReceivedHttpError(view, request, errorResponse)
+            if (request?.isForMainFrame == true) {
+                val code = errorResponse?.statusCode ?: 0
+                if (code >= 400) mainFrameLoadError = true
+            }
         }
 
         override fun onPageFinished(view: WebView?, url: String?) {
             super.onPageFinished(view, url)
+            // post 一次，尽量避免与 onReceivedError / onReceivedHttpError 的时序竞态
+            view?.post {
+                if (!mainFrameLoadError) hideSplashOverlay()
+            }
             // 注入脚本，拦截 blob: 链接并通过 BlobDownloader 保存到本地
             val blobInterceptor = """
                 (function () {
@@ -775,6 +811,7 @@ class MainActivity : AppCompatActivity() {
 
         override fun onPageStarted(view: WebView?, url: String?, favicon: Bitmap?) {
             super.onPageStarted(view, url, favicon)
+            mainFrameLoadError = false
             if (debug) {
                 // vConsole
                 val vConsole = assets.open("vConsole.js").bufferedReader().use { it.readText() }
