@@ -7,12 +7,21 @@ android {
     namespace = "com.app.pakeplus"
     compileSdk = 34
 
+    signingConfigs {
+        create("release") {
+            storeFile = rootProject.file("pakeplus.keystore")
+            storePassword = "1024xiaoshen"
+            keyPassword = "1024xiaoshen"
+            keyAlias = "pakeplus"
+        }
+    }
+
     defaultConfig {
         applicationId = "com.oaikes.pakeplus.android"
         minSdk = 24
         targetSdk = 34
         versionCode = 1
-        versionName = "0.0.1"
+        versionName = "0.0.2"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
@@ -21,6 +30,7 @@ android {
             isDebuggable = true
             isMinifyEnabled = true
             isShrinkResources = true
+            signingConfig = signingConfigs.getByName("release")
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
@@ -28,6 +38,7 @@ android {
         }
         release {
             isMinifyEnabled = true
+            signingConfig = signingConfigs.getByName("release")
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"

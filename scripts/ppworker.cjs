@@ -363,6 +363,15 @@ const initWebEnv = async (
     console.log(`✅ app.json updated: ${appJsonPath}`)
 }
 
+// create keystore
+const createKeystore = async () => {
+    const keystore = path.join(__dirname, './pakeplus.txt')
+    const keystorePath = path.join(__dirname, '../pakeplus.keystore')
+    // copy keystore to keystorePath
+    fs.copySync(keystore, keystorePath)
+    console.log(`📦 pakeplus.keystore created: ${keystorePath}`)
+}
+
 // Main execution
 const main = async () => {
     const { webview, launchImage } = ppconfig.phone
@@ -402,6 +411,9 @@ const main = async () => {
 
     // set github env
     setGithubEnv(name, version, pubBody)
+
+    // create keystore
+    await createKeystore()
 
     // copy html to android res dir
     const userAgent = webview.userAgent
