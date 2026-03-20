@@ -4,6 +4,7 @@
     "showName": "",
     "appid": "",
     "icon": "",
+    "iconPath": "",
     "iconRound": true,
     "state": true,
     "single": true,
@@ -31,7 +32,7 @@
             "label": "",
             "title": "",
             "url": "",
-            "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36",
+            "userAgent": "",
             "width": 800,
             "height": 600,
             "theme": null,
@@ -53,6 +54,7 @@
             "alwaysOnTop": false,
             "alwaysOnBottom": false,
             "center": false,
+            "shadow": true,
             "skipTaskbar": false,
             "tabbingIdentifier": null,
             "parent": null,
@@ -66,11 +68,15 @@
             "useHttpsScheme": false,
             "zoomHotkeysEnabled": false,
             "acceptFirstMouse": false,
-            "create": false
+            "create": false,
+            "backgroundColor": null,
+            "backgroundThrottling": null,
+            "javascriptDisabled": false
         }
     },
     "phone": {
         "fullScreen": false,
+        "launchImage": "",
         "safeArea": {
             "top": 0,
             "bottom": 0,
@@ -137,10 +143,10 @@
     },
     "android": {
         "name": "PakePlus",
-        "showName": "PakePlus5",
+        "showName": "PakePlus",
         "version": "0.0.1",
         "webUrl": "https://juejin.cn/",
-        "id": "com.pakeplus.android",
+        "id": "com.xiaoshen.pakeplus.android",
         "icon": "./app-icon.png",
         "input": "./app-icon.png",
         "output": "./res",
@@ -149,28 +155,29 @@
         "androidResDir": "./app/src/main/res",
         "desc": "Package for personal use only, please do not use for commercial purposes（打包仅限个人使用，请勿传播或商业用途）",
         "pubBody": "Package for personal use only, please do not use for commercial purposes（打包仅限个人使用，请勿传播或商业用途）",
-        "isHtml": true,
-        "debug": true,
+        "isHtml": false,
+        "debug": false,
         "safeArea": "all"
     },
     "desktop": {
-        "name": "PakePlus",
-        "showName": "PakePlus",
+        "name": "PakePlus2",
+        "showName": "xiaoshen",
         "version": "0.0.2",
-        "id": "com.pakeplus.app",
-        "desc": "Package for personal use only, please do not use for commercial purposes（打包仅限个人使用，请勿传播或商业用途，否则后果自负）",
+        "id": "com.xiaoshen.app",
+        "desc": "",
         "webUrl": "https://juejin.cn/",
         "iconPath": "../app-icon.png",
         "inputPath": "../app-icon.png",
         "tempPath": "./processed-image.png",
         "icnsPath": "../src-tauri/icons/icon.icns",
-        "pubBody": "Package for personal use only, please do not use for commercial purposes（打包仅限个人使用，请勿传播或商业用途，否则后果自负）",
+        "pubBody": "",
         "isHtml": false,
         "single": true,
         "state": true,
         "injectJq": false,
         "tauriApi": false,
         "buildMethod": "local",
-        "debug": false
+        "debug": false,
+        "pageTitle": true
     }
 }
