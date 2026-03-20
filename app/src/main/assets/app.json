@@ -6,7 +6,7 @@
     "webUrl": "https://pphtml.pages.dev/",
     "debug": false,
     "userAgent": "",
-    "fullScreen": false,
+    "fullScreen": true,
     "videoFull": false,
     "download": false,
     "upload": false,

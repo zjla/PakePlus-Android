@@ -14,9 +14,11 @@
         <!-- Customize your theme here. -->
     </style>
 
-    <style name="Theme.PakePlus.NoActionBar">
+    <style name="Theme.PakePlus.NoActionBar" parent="Theme.PakePlus">
         <item name="windowActionBar">false</item>
         <item name="windowNoTitle">true</item>
+        <!-- 冷启动窗口背景，与界面内启动遮罩一致 -->
+<!--        <item name="android:windowBackground">@drawable/splash_launch</item>-->
     </style>
 
     <style name="Theme.PakePlus.AppBarOverlay" parent="ThemeOverlay.AppCompat.Dark.ActionBar" />
