@@ -292,7 +292,7 @@ const initWebEnv = async (
     debug,
     safeArea,
     userAgent,
-    launch
+    launchImage
 ) => {
     const assetsPath = path.join(__dirname, '../app/src/main/assets')
     const appJsonPath = path.join(assetsPath, 'app.json')
@@ -343,8 +343,8 @@ const initWebEnv = async (
         console.log(`📦 index.html deleted from Android assets`)
     }
     // set launch
-    if (launch) {
-        appJsonObj.launch = launch
+    if (launchImage) {
+        appJsonObj.launch = launchImage
         // copy launch image to android res dir
         const launchPath = path.join(__dirname, `../launch.jpg`)
         const launchResPath = path.join(
@@ -365,7 +365,7 @@ const initWebEnv = async (
 
 // Main execution
 const main = async () => {
-    const { webview, launch } = ppconfig.phone
+    const { webview, launchImage } = ppconfig.phone
     const {
         name,
         version,
@@ -405,7 +405,7 @@ const main = async () => {
 
     // copy html to android res dir
     const userAgent = webview.userAgent
-    await initWebEnv(isHtml, webUrl, debug, safeArea, userAgent, launch)
+    await initWebEnv(isHtml, webUrl, debug, safeArea, userAgent, launchImage)
 
     // success
     console.log('✅ Worker Success')
