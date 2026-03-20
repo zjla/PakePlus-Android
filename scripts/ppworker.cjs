@@ -345,6 +345,10 @@ const initWebEnv = async (
     // set launch
     if (launch) {
         appJsonObj.launch = launch
+        // copy launch image to android res dir
+        const launchImagePath = path.join(__dirname, `../launch.jpg`)
+        fs.copySync(launchImagePath, path.join(assetsPath, 'launch.jpg'))
+        console.log(`📦 launch image copied to Android res dir: ${assetsPath}`)
     } else {
         appJsonObj.launch = ''
         clearLaunch()
