@@ -244,7 +244,7 @@ class MainActivity : AppCompatActivity() {
         webView.clearCache(true)
 
         // 为 blob: 链接下载注入 JS 接口
-        webView.addJavascriptInterface(BlobDownloadInterface(this), "BlobDownloader")
+        webView.addJavascriptInterface(JsInterface(this), "JsBridge")
 
         // inject js
         webView.webViewClient = MyWebViewClient(debug)
@@ -515,10 +515,11 @@ class MainActivity : AppCompatActivity() {
     }
 
     /**
-     * JS 调用的接口：接收 base64 数据并保存为文件
+     * JS 调用的接口
      */
-    inner class BlobDownloadInterface(private val context: Context) {
+    inner class JsInterface(private val context: Context) {
 
+        // 接收 base64 数据并保存为文件
         @JavascriptInterface
         fun downloadBase64File(base64Data: String, mimeType: String?, fileName: String?) {
             try {
@@ -551,6 +552,19 @@ class MainActivity : AppCompatActivity() {
                 Log.e("BlobDownload", "save error", e)
                 showTopToast(context, "保存失败: ${e.message}", Toast.LENGTH_LONG)
             }
+        }
+
+        // 接收一个url，用默认浏览器打开
+        @JavascriptInterface
+        fun openUrl(url: String) {
+            val intent = Intent(Intent.ACTION_VIEW, url.toUri())
+            context.startActivity(intent)
+        }
+
+        // 判断是不是安卓客户端
+        @JavascriptInterface
+        fun isAndroid(): Boolean {
+            return true
         }
     }
 
@@ -782,7 +796,7 @@ class MainActivity : AppCompatActivity() {
             view?.post {
                 if (!mainFrameLoadError) hideSplashOverlay()
             }
-            // 注入脚本，拦截 blob: 链接并通过 BlobDownloader 保存到本地
+            // 注入脚本，拦截 blob: 链接并通过 JsBridge 保存到本地
             val blobInterceptor = """
                 (function () {
                   if (window.__blobDownloadInjected) return;
@@ -817,10 +831,10 @@ class MainActivity : AppCompatActivity() {
                               var commaIndex = dataUrl.indexOf(',');
                               var base64 = commaIndex >= 0 ? dataUrl.substring(commaIndex + 1) : dataUrl;
                               var mime = blob.type || 'application/octet-stream';
-                              if (window.BlobDownloader && window.BlobDownloader.downloadBase64File) {
-                                window.BlobDownloader.downloadBase64File(base64, mime, fileName);
+                              if (window.JsBridge && window.JsBridge.downloadBase64File) {
+                                window.JsBridge.downloadBase64File(base64, mime, fileName);
                               } else {
-                                console.error('BlobDownloader not found on window');
+                                console.error('JsBridge not found on window');
                               }
                             } catch (err) {
                               console.error('Blob download convert error', err);
