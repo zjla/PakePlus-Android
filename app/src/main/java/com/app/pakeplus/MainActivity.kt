@@ -566,6 +566,12 @@ class MainActivity : AppCompatActivity() {
         fun isAndroid(): Boolean {
             return true
         }
+
+        // is app
+        @JavascriptInterface
+        fun isApp(): Boolean {
+            return true
+        }
     }
 
     /**
