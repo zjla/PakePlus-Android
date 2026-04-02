@@ -27,6 +27,7 @@ import android.webkit.WebChromeClient
 import android.webkit.WebResourceError
 import android.webkit.WebResourceRequest
 import android.webkit.WebResourceResponse
+import android.webkit.GeolocationPermissions
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import android.webkit.MimeTypeMap
@@ -70,6 +71,10 @@ class MainActivity : AppCompatActivity() {
     private lateinit var fileChooserLauncher: ActivityResultLauncher<Intent>
     private lateinit var permissionLauncher: ActivityResultLauncher<Array<String>>
     private var pendingPermissionRequest: PermissionRequest? = null
+
+    private lateinit var locationPermissionLauncher: ActivityResultLauncher<Array<String>>
+    private var pendingGeolocationOrigin: String? = null
+    private var pendingGeolocationCallback: GeolocationPermissions.Callback? = null
 
     // 全屏视频相关
     private var customView: View? = null
@@ -138,6 +143,21 @@ class MainActivity : AppCompatActivity() {
             pendingPermissionRequest = null
         }
 
+        // 网页 HTML5 定位（navigator.geolocation）
+        locationPermissionLauncher = registerForActivityResult(
+            ActivityResultContracts.RequestMultiplePermissions()
+        ) { results ->
+            val origin = pendingGeolocationOrigin
+            val geoCallback = pendingGeolocationCallback
+            pendingGeolocationOrigin = null
+            pendingGeolocationCallback = null
+            if (origin != null && geoCallback != null) {
+                val fine = results[Manifest.permission.ACCESS_FINE_LOCATION] == true
+                val coarse = results[Manifest.permission.ACCESS_COARSE_LOCATION] == true
+                geoCallback.invoke(origin, fine || coarse, false)
+            }
+        }
+
         // parseJsonWithNative
         val config = parseJsonWithNative(this, "app.json")
         val fullScreen = config?.get("fullScreen") as? Boolean ?: false
@@ -201,6 +221,7 @@ class MainActivity : AppCompatActivity() {
         webView.settings.apply {
             javaScriptEnabled = true
             domStorageEnabled = true
+            setGeolocationEnabled(true)
             allowFileAccess = true
             useWideViewPort = true
             allowFileAccessFromFileURLs = true
@@ -888,6 +909,42 @@ class MainActivity : AppCompatActivity() {
             super.onPermissionRequestCanceled(request)
             if (activity.pendingPermissionRequest == request) {
                 activity.pendingPermissionRequest = null
+            }
+        }
+
+        override fun onGeolocationPermissionsShowPrompt(
+            origin: String?,
+            callback: GeolocationPermissions.Callback?
+        ) {
+            if (origin == null || callback == null) {
+                super.onGeolocationPermissionsShowPrompt(origin, callback)
+                return
+            }
+            activity.runOnUiThread {
+                val fineOk = ContextCompat.checkSelfPermission(
+                    activity,
+                    Manifest.permission.ACCESS_FINE_LOCATION
+                ) == PackageManager.PERMISSION_GRANTED
+                val coarseOk = ContextCompat.checkSelfPermission(
+                    activity,
+                    Manifest.permission.ACCESS_COARSE_LOCATION
+                ) == PackageManager.PERMISSION_GRANTED
+                if (fineOk || coarseOk) {
+                    callback.invoke(origin, true, false)
+                    return@runOnUiThread
+                }
+                val need = buildList {
+                    if (!fineOk) add(Manifest.permission.ACCESS_FINE_LOCATION)
+                    if (!coarseOk) add(Manifest.permission.ACCESS_COARSE_LOCATION)
+                }.toTypedArray()
+                activity.pendingGeolocationCallback?.let { prevCb ->
+                    activity.pendingGeolocationOrigin?.let { prevOrigin ->
+                        prevCb.invoke(prevOrigin, false, false)
+                    }
+                }
+                activity.pendingGeolocationOrigin = origin
+                activity.pendingGeolocationCallback = callback
+                activity.locationPermissionLauncher.launch(need)
             }
         }
 
