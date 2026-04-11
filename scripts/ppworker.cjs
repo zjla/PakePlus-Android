@@ -379,9 +379,39 @@ const createKeystore = async () => {
     console.log(`📦 pakeplus.keystore created: ${keystorePath}`)
 }
 
+// update manifest.xml
+const updateManifest = async (direction = 'default') => {
+    const manifestPath = path.join(
+        __dirname,
+        '../app/src/main/AndroidManifest.xml'
+    )
+    let content = await fs.readFile(manifestPath, 'utf8')
+    // update screenOrientation
+    if (direction === 'default') {
+        content = content.replace(
+            /android:screenOrientation=".*?"/,
+            `android:screenOrientation="unspecified"`
+        )
+    } else if (direction === 'horizontal') {
+        content = content.replace(
+            /android:screenOrientation=".*?"/,
+            `android:screenOrientation="sensorLandscape"`
+        )
+    } else if (direction === 'vertical') {
+        content = content.replace(
+            /android:screenOrientation=".*?"/,
+            `android:screenOrientation="sensorPortrait"`
+        )
+    } else {
+        console.log('⚠️ Invalid direction:', direction)
+    }
+    await fs.writeFile(manifestPath, content)
+    console.log(`✅ manifest.xml updated: ${manifestPath}`)
+}
+
 // Main execution
 const main = async () => {
-    const { webview, launchImage, screenOn } = ppconfig.phone
+    const { webview, launchImage, screenOn, direction } = ppconfig.phone
     const {
         name,
         version,
@@ -433,6 +463,9 @@ const main = async () => {
         launchImage,
         screenOn
     )
+
+    // update manifest.xml
+    await updateManifest(direction)
 
     // success
     console.log('✅ Worker Success')
