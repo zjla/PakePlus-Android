@@ -75,6 +75,7 @@
         }
     },
     "phone": {
+        "screenOn": false,
         "fullScreen": false,
         "launchImage": "",
         "safeArea": {

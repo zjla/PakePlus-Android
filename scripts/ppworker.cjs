@@ -292,7 +292,8 @@ const initWebEnv = async (
     debug,
     safeArea,
     userAgent,
-    launchImage
+    launchImage,
+    screenOn
 ) => {
     const assetsPath = path.join(__dirname, '../app/src/main/assets')
     const appJsonPath = path.join(assetsPath, 'app.json')
@@ -311,6 +312,12 @@ const initWebEnv = async (
         appJsonObj.fullScreen = true
     } else {
         appJsonObj.fullScreen = false
+    }
+    // set screenOn
+    if (screenOn) {
+        appJsonObj.screenOn = true
+    } else {
+        appJsonObj.screenOn = false
     }
     // set html
     if (isHtml) {
@@ -374,7 +381,7 @@ const createKeystore = async () => {
 
 // Main execution
 const main = async () => {
-    const { webview, launchImage } = ppconfig.phone
+    const { webview, launchImage, screenOn } = ppconfig.phone
     const {
         name,
         version,
@@ -417,7 +424,15 @@ const main = async () => {
 
     // copy html to android res dir
     const userAgent = webview.userAgent
-    await initWebEnv(isHtml, webUrl, debug, safeArea, userAgent, launchImage)
+    await initWebEnv(
+        isHtml,
+        webUrl,
+        debug,
+        safeArea,
+        userAgent,
+        launchImage,
+        screenOn
+    )
 
     // success
     console.log('✅ Worker Success')
