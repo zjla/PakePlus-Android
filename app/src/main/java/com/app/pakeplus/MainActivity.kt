@@ -90,6 +90,9 @@ class MainActivity : AppCompatActivity() {
     /** app.json 中 launch 非空时才显示启动图遮罩 */
     private var showLaunchSplash: Boolean = false
 
+    /** app.json 中 screenOn 为 true */
+    private var keepScreenOnFromConfig: Boolean = false
+
     @SuppressLint("SetJavaScriptEnabled", "ClickableViewAccessibility")
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -167,6 +170,10 @@ class MainActivity : AppCompatActivity() {
         val webUrl = config?.get("webUrl") as? String ?: "https://pakeplus.com/"
         val launchCfg = config?.get("launch") as? String
         showLaunchSplash = !launchCfg.isNullOrBlank()
+        keepScreenOnFromConfig = config?.get("screenOn") as? Boolean ?: false
+        if (keepScreenOnFromConfig) {
+            window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        }
         // enable debug by chrome://inspect
         WebView.setWebContentsDebuggingEnabled(debug)
         // config fullscreen
@@ -389,7 +396,7 @@ class MainActivity : AppCompatActivity() {
 
         customView = view
         customViewCallback = callback
-        
+
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
 
         // 保存当前屏幕方向
@@ -451,7 +458,9 @@ class MainActivity : AppCompatActivity() {
         // 恢复屏幕方向
         requestedOrientation = originalOrientation
 
-        window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        if (!keepScreenOnFromConfig) {
+            window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        }
     }
 
     // 隐藏系统UI（全屏模式）
@@ -503,6 +512,7 @@ class MainActivity : AppCompatActivity() {
             val userAgent = jsonObject.getString("userAgent")
             val fullScreen = jsonObject.getBoolean("fullScreen")
             val launch = jsonObject.getString("launch")
+            val screenOn = jsonObject.optBoolean("screenOn", false)
             // 返回键值对
             mapOf(
                 "name" to name,
@@ -510,7 +520,8 @@ class MainActivity : AppCompatActivity() {
                 "debug" to debug,
                 "userAgent" to userAgent,
                 "fullScreen" to fullScreen,
-                "launch" to launch
+                "launch" to launch,
+                "screenOn" to screenOn
             )
         } catch (e: Exception) {
             e.printStackTrace()
