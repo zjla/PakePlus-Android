@@ -389,6 +389,8 @@ class MainActivity : AppCompatActivity() {
 
         customView = view
         customViewCallback = callback
+        
+        window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
 
         // 保存当前屏幕方向
         originalOrientation = requestedOrientation
@@ -448,6 +450,8 @@ class MainActivity : AppCompatActivity() {
 
         // 恢复屏幕方向
         requestedOrientation = originalOrientation
+
+        window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
     }
 
     // 隐藏系统UI（全屏模式）

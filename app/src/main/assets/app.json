@@ -17,5 +17,6 @@
     "douyin": false,
     "browser": false,
     "gesture": false,
-    "launch": ""
+    "launch": "",
+    "screenOn": false
 }
