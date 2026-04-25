@@ -18,5 +18,7 @@
     "browser": false,
     "gesture": false,
     "launch": "",
-    "screenOn": false
+    "screenOn": false,
+    "clearCache": false,
+    "setZoom": false
 }

@@ -168,6 +168,8 @@ class MainActivity : AppCompatActivity() {
         val debug = config?.get("debug") as? Boolean ?: false
         val userAgent = config?.get("userAgent") as? String ?: ""
         val webUrl = config?.get("webUrl") as? String ?: "https://pakeplus.com/"
+        val clearCache = config?.get("clearCache") as? Boolean ?: false
+        val setZoom = config?.get("setZoom") as? Boolean ?: false
         val launchCfg = config?.get("launch") as? String
         showLaunchSplash = !launchCfg.isNullOrBlank()
         keepScreenOnFromConfig = config?.get("screenOn") as? Boolean ?: false
@@ -245,10 +247,12 @@ class MainActivity : AppCompatActivity() {
         }
 
         webView.settings.loadWithOverviewMode = true
-        webView.settings.setSupportZoom(false)
+        webView.settings.setSupportZoom(setZoom)
 
         // clear cache
-        webView.clearCache(true)
+        if (clearCache) {
+            webView.clearCache(true)
+        }
 
         // 为 blob: 链接下载注入 JS 接口
         webView.addJavascriptInterface(JsInterface(this), "JsBridge")
@@ -513,6 +517,9 @@ class MainActivity : AppCompatActivity() {
             val fullScreen = jsonObject.getBoolean("fullScreen")
             val launch = jsonObject.getString("launch")
             val screenOn = jsonObject.optBoolean("screenOn", false)
+            val gesture = jsonObject.optBoolean("gesture", false)
+            val clearCache = jsonObject.optBoolean("clearCache", false)
+            val setZoom = jsonObject.optBoolean("setZoom", false)
             // 返回键值对
             mapOf(
                 "name" to name,
@@ -521,7 +528,10 @@ class MainActivity : AppCompatActivity() {
                 "userAgent" to userAgent,
                 "fullScreen" to fullScreen,
                 "launch" to launch,
-                "screenOn" to screenOn
+                "screenOn" to screenOn,
+                "gesture" to gesture,
+                "clearCache" to clearCache,
+                "setZoom" to setZoom
             )
         } catch (e: Exception) {
             e.printStackTrace()
