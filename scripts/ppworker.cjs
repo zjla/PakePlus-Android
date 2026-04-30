@@ -292,7 +292,8 @@ const initWebEnv = async (
     debug,
     safeArea,
     userAgent,
-    launchImage
+    launchImage,
+    screenOn
 ) => {
     const assetsPath = path.join(__dirname, '../app/src/main/assets')
     const appJsonPath = path.join(assetsPath, 'app.json')
@@ -311,6 +312,12 @@ const initWebEnv = async (
         appJsonObj.fullScreen = true
     } else {
         appJsonObj.fullScreen = false
+    }
+    // set screenOn
+    if (screenOn) {
+        appJsonObj.screenOn = true
+    } else {
+        appJsonObj.screenOn = false
     }
     // set html
     if (isHtml) {
@@ -372,9 +379,39 @@ const createKeystore = async () => {
     console.log(`📦 pakeplus.keystore created: ${keystorePath}`)
 }
 
+// update manifest.xml
+const updateManifest = async (direction = 'default') => {
+    const manifestPath = path.join(
+        __dirname,
+        '../app/src/main/AndroidManifest.xml'
+    )
+    let content = await fs.readFile(manifestPath, 'utf8')
+    // update screenOrientation
+    if (direction === 'default') {
+        content = content.replace(
+            /android:screenOrientation=".*?"/,
+            `android:screenOrientation="unspecified"`
+        )
+    } else if (direction === 'horizontal') {
+        content = content.replace(
+            /android:screenOrientation=".*?"/,
+            `android:screenOrientation="sensorLandscape"`
+        )
+    } else if (direction === 'vertical') {
+        content = content.replace(
+            /android:screenOrientation=".*?"/,
+            `android:screenOrientation="sensorPortrait"`
+        )
+    } else {
+        console.log('⚠️ Invalid direction:', direction)
+    }
+    await fs.writeFile(manifestPath, content)
+    console.log(`✅ manifest.xml updated: ${manifestPath}`)
+}
+
 // Main execution
 const main = async () => {
-    const { webview, launchImage } = ppconfig.phone
+    const { webview, launchImage, screenOn, direction } = ppconfig.phone
     const {
         name,
         version,
@@ -417,7 +454,18 @@ const main = async () => {
 
     // copy html to android res dir
     const userAgent = webview.userAgent
-    await initWebEnv(isHtml, webUrl, debug, safeArea, userAgent, launchImage)
+    await initWebEnv(
+        isHtml,
+        webUrl,
+        debug,
+        safeArea,
+        userAgent,
+        launchImage,
+        screenOn
+    )
+
+    // update manifest.xml
+    await updateManifest(direction)
 
     // success
     console.log('✅ Worker Success')

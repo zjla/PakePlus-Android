@@ -3,7 +3,11 @@
     "version": "1.0.0",
     "description": "A sample mobile application by PakePlus",
     "author": "1024coder",
+<<<<<<< HEAD
     "webUrl": "https://pphtml.pages.dev/app",
+=======
+    "webUrl": "https://pphtml.pages.dev/",
+>>>>>>> fbd000c59de2dfca42c583658bce56add219dc14
     "debug": false,
     "userAgent": "",
     "fullScreen": false,
@@ -17,6 +21,13 @@
     "douyin": false,
     "browser": false,
     "gesture": false,
+<<<<<<< HEAD
     "callPhone": false,
     "launch": ""
+=======
+    "launch": "",
+    "screenOn": false,
+    "clearCache": false,
+    "setZoom": false
+>>>>>>> fbd000c59de2dfca42c583658bce56add219dc14
 }

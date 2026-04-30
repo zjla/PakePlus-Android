@@ -77,6 +77,11 @@
     "phone": {
         "fullScreen": false,
         "launchImage": "",
+        "screenOn": false,
+        "download": true,
+        "internet": true,
+        "position": true,
+        "direction": "default",
         "safeArea": {
             "top": 0,
             "bottom": 0,

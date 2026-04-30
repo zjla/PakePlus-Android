@@ -90,6 +90,9 @@ class MainActivity : AppCompatActivity() {
     /** app.json 中 launch 非空时才显示启动图遮罩 */
     private var showLaunchSplash: Boolean = false
 
+    /** app.json 中 screenOn 为 true */
+    private var keepScreenOnFromConfig: Boolean = false
+
     @SuppressLint("SetJavaScriptEnabled", "ClickableViewAccessibility")
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -165,8 +168,14 @@ class MainActivity : AppCompatActivity() {
         val debug = config?.get("debug") as? Boolean ?: false
         val userAgent = config?.get("userAgent") as? String ?: ""
         val webUrl = config?.get("webUrl") as? String ?: "https://pakeplus.com/"
+        val clearCache = config?.get("clearCache") as? Boolean ?: false
+        val setZoom = config?.get("setZoom") as? Boolean ?: false
         val launchCfg = config?.get("launch") as? String
         showLaunchSplash = !launchCfg.isNullOrBlank()
+        keepScreenOnFromConfig = config?.get("screenOn") as? Boolean ?: false
+        if (keepScreenOnFromConfig) {
+            window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        }
         // enable debug by chrome://inspect
         WebView.setWebContentsDebuggingEnabled(debug)
         // config fullscreen
@@ -238,10 +247,12 @@ class MainActivity : AppCompatActivity() {
         }
 
         webView.settings.loadWithOverviewMode = true
-        webView.settings.setSupportZoom(false)
+        webView.settings.setSupportZoom(setZoom)
 
         // clear cache
-        webView.clearCache(false)
+        if (clearCache) {
+            webView.clearCache(true)
+        }
 
         // 为 blob: 链接下载注入 JS 接口
         webView.addJavascriptInterface(JsInterface(this), "JsBridge")
@@ -390,6 +401,8 @@ class MainActivity : AppCompatActivity() {
         customView = view
         customViewCallback = callback
 
+        window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+
         // 保存当前屏幕方向
         originalOrientation = requestedOrientation
 
@@ -448,6 +461,10 @@ class MainActivity : AppCompatActivity() {
 
         // 恢复屏幕方向
         requestedOrientation = originalOrientation
+
+        if (!keepScreenOnFromConfig) {
+            window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        }
     }
 
     // 隐藏系统UI（全屏模式）
@@ -499,6 +516,10 @@ class MainActivity : AppCompatActivity() {
             val userAgent = jsonObject.getString("userAgent")
             val fullScreen = jsonObject.getBoolean("fullScreen")
             val launch = jsonObject.getString("launch")
+            val screenOn = jsonObject.optBoolean("screenOn", false)
+            val gesture = jsonObject.optBoolean("gesture", false)
+            val clearCache = jsonObject.optBoolean("clearCache", false)
+            val setZoom = jsonObject.optBoolean("setZoom", false)
             // 返回键值对
             mapOf(
                 "name" to name,
@@ -506,7 +527,11 @@ class MainActivity : AppCompatActivity() {
                 "debug" to debug,
                 "userAgent" to userAgent,
                 "fullScreen" to fullScreen,
-                "launch" to launch
+                "launch" to launch,
+                "screenOn" to screenOn,
+                "gesture" to gesture,
+                "clearCache" to clearCache,
+                "setZoom" to setZoom
             )
         } catch (e: Exception) {
             e.printStackTrace()
