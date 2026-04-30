@@ -93,6 +93,9 @@ class MainActivity : AppCompatActivity() {
     /** app.json 中 screenOn 为 true */
     private var keepScreenOnFromConfig: Boolean = false
 
+    /** 仅当 app.json 中 callPhone 为 true 才允许跳转拨号器 */
+    private var allowCallPhoneFromConfig: Boolean = false
+
     @SuppressLint("SetJavaScriptEnabled", "ClickableViewAccessibility")
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -170,6 +173,7 @@ class MainActivity : AppCompatActivity() {
         val webUrl = config?.get("webUrl") as? String ?: "https://pakeplus.com/"
         val clearCache = config?.get("clearCache") as? Boolean ?: false
         val setZoom = config?.get("setZoom") as? Boolean ?: false
+        allowCallPhoneFromConfig = config?.get("callPhone") as? Boolean ?: false
         val launchCfg = config?.get("launch") as? String
         showLaunchSplash = !launchCfg.isNullOrBlank()
         keepScreenOnFromConfig = config?.get("screenOn") as? Boolean ?: false
@@ -520,6 +524,7 @@ class MainActivity : AppCompatActivity() {
             val gesture = jsonObject.optBoolean("gesture", false)
             val clearCache = jsonObject.optBoolean("clearCache", false)
             val setZoom = jsonObject.optBoolean("setZoom", false)
+            val callPhone = jsonObject.optBoolean("callPhone", false)
             // 返回键值对
             mapOf(
                 "name" to name,
@@ -531,7 +536,8 @@ class MainActivity : AppCompatActivity() {
                 "screenOn" to screenOn,
                 "gesture" to gesture,
                 "clearCache" to clearCache,
-                "setZoom" to setZoom
+                "setZoom" to setZoom,
+                "callPhone" to callPhone
             )
         } catch (e: Exception) {
             e.printStackTrace()
@@ -719,6 +725,10 @@ class MainActivity : AppCompatActivity() {
 
             // tel: 用系统拨号器打开（ACTION_DIAL 不需要 CALL_PHONE 权限）
             if (fixedUrl.startsWith("tel:", ignoreCase = true)) {
+                if (!allowCallPhoneFromConfig) {
+                    showTopToast(this@MainActivity, "已禁用拨打电话功能", Toast.LENGTH_SHORT)
+                    return true
+                }
                 // Android 11+ 上 resolveActivity 可能因“包可见性”返回 null，即使系统存在拨号器；
                 // 这里直接尝试启动并捕获异常更可靠。
                 return try {
