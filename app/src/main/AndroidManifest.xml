@@ -25,6 +25,12 @@
     <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
     <!-- 允许打开哪些外部应用   -->
     <queries>
+        <!-- 允许查询并打开系统拨号器（Android 11+ 包可见性） -->
+        <intent>
+            <action android:name="android.intent.action.DIAL" />
+            <data android:scheme="tel" />
+        </intent>
+
         <!-- 云盘 -->
         <package android:name="com.baidu.netdisk" />
         <package android:name="com.tencent.weiyun" />

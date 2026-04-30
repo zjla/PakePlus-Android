@@ -3,7 +3,7 @@
     "version": "1.0.0",
     "description": "A sample mobile application by PakePlus",
     "author": "1024coder",
-    "webUrl": "http://192.168.31.197:4173/app.html",
+    "webUrl": "https://pphtml.pages.dev/app",
     "debug": false,
     "userAgent": "",
     "fullScreen": false,
@@ -17,5 +17,6 @@
     "douyin": false,
     "browser": false,
     "gesture": false,
+    "callPhone": false,
     "launch": ""
 }

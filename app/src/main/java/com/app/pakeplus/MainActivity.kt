@@ -241,7 +241,7 @@ class MainActivity : AppCompatActivity() {
         webView.settings.setSupportZoom(false)
 
         // clear cache
-        webView.clearCache(true)
+        webView.clearCache(false)
 
         // 为 blob: 链接下载注入 JS 接口
         webView.addJavascriptInterface(JsInterface(this), "JsBridge")
@@ -688,10 +688,26 @@ class MainActivity : AppCompatActivity() {
 
     inner class MyWebViewClient(val debug: Boolean) : WebViewClient() {
 
-        @Deprecated("Deprecated in Java", ReplaceWith("false"))
-        override fun shouldOverrideUrlLoading(view: WebView?, url: String?): Boolean {
-            if (url == null) return false
-            val fixedUrl = url.toString()
+        private fun handleOverrideUrl(view: WebView?, rawUrl: String?): Boolean {
+            if (rawUrl.isNullOrBlank()) return false
+            val fixedUrl = rawUrl.toString()
+
+            // tel: 用系统拨号器打开（ACTION_DIAL 不需要 CALL_PHONE 权限）
+            if (fixedUrl.startsWith("tel:", ignoreCase = true)) {
+                // Android 11+ 上 resolveActivity 可能因“包可见性”返回 null，即使系统存在拨号器；
+                // 这里直接尝试启动并捕获异常更可靠。
+                return try {
+                    val intent = Intent(Intent.ACTION_DIAL, fixedUrl.toUri())
+                    view?.context?.startActivity(intent)
+                    true
+                } catch (e: ActivityNotFoundException) {
+                    showTopToast(this@MainActivity, "未找到可拨号的应用", Toast.LENGTH_SHORT)
+                    true
+                } catch (e: Exception) {
+                    Log.e("WebViewClient", "Error handling tel url: $fixedUrl", e)
+                    true
+                }
+            }
 
             // 对常见文件类型的 HTTP/HTTPS 链接，直接拦截为下载，不在 WebView 内打开
             if (fixedUrl.startsWith("http://") || fixedUrl.startsWith("https://")) {
@@ -722,16 +738,16 @@ class MainActivity : AppCompatActivity() {
                     // 解析 Intent URI
                     val intent = Intent.parseUri(fixedUrl, Intent.URI_INTENT_SCHEME)
 
-                    // 检查设备上是否有应用可以处理此 Intent
-                    if (intent.resolveActivity(view?.context?.packageManager!!) != null) {
-                        view.context?.startActivity(intent)
+                    val pm = view?.context?.packageManager
+                    if (pm != null && intent.resolveActivity(pm) != null) {
+                        view.context.startActivity(intent)
                         return true // 已经处理，阻止 WebView 加载
                     }
 
                     // 如果找不到能处理的应用，可以尝试打开备用 URL (如果 Intent 中有定义 fallback URL)
                     val fallbackUrl = intent.getStringExtra("browser_fallback_url")
                     if (!fallbackUrl.isNullOrEmpty()) {
-                        view.loadUrl(fallbackUrl)
+                        view?.loadUrl(fallbackUrl)
                         return true // 加载备用 URL
                     }
 
@@ -741,31 +757,38 @@ class MainActivity : AppCompatActivity() {
                 } catch (e: ActivityNotFoundException) {
                     // 找不到匹配的 Activity (外部应用未安装)，此情况通常在 `resolveActivity` 后捕获
                     Log.e("WebViewClient", "No activity found to handle Intent: $fixedUrl", e)
-                    // 您也可以在这里加载一个 "未安装应用" 的提示页面
                 }
-                // 如果是 Intent 但无法处理（例如未安装应用），您可以选择返回 false 让 WebView 尝试加载（通常会失败）
-                // 或者继续执行下面的 Scheme 检查
+                // 如果是 Intent 但无法处理，继续执行下面的 Scheme 检查
             }
 
-
-            // 3. 检查是否是其他自定义 Scheme (e.g., weixin://, zhihu://)
-            // 注意：Intent URI 是更通用和推荐的方式，但有些应用可能直接使用 Scheme。
-            try {
+            // 3. 检查是否是其他自定义 Scheme (e.g., weixin://, zhihu://, mailto://, sms://)
+            return try {
                 val intent = Intent(Intent.ACTION_VIEW, fixedUrl.toUri())
-                // 必须检查是否有应用可以处理此 Intent，否则会导致崩溃
-                if (intent.resolveActivity(view?.context?.packageManager!!) != null) {
-                    view.context?.startActivity(intent)
-                    return true // 已经处理，阻止 WebView 加载
+                val pm = view?.context?.packageManager
+                if (pm != null && intent.resolveActivity(pm) != null) {
+                    view.context.startActivity(intent)
+                    true // 已经处理，阻止 WebView 加载
                 } else {
-                    // 没有安装相应的应用
-                    Log.w("WebViewClient", "External app not installed for: $fixedUrl")
-                    // 可以添加逻辑提示用户下载应用或打开相应的应用商店链接
+                    Log.w("WebViewClient", "No activity to handle: $fixedUrl")
+                    // 拦截掉未知 scheme，避免 WebView 报 UNKNOWN_URL_SCHEME
+                    !fixedUrl.startsWith("about:", ignoreCase = true) &&
+                        !fixedUrl.startsWith("javascript:", ignoreCase = true)
                 }
             } catch (e: Exception) {
                 Log.e("WebViewClient", "Error starting external app: $fixedUrl", e)
+                // 拦截掉异常的 scheme，避免 WebView 报 UNKNOWN_URL_SCHEME
+                true
             }
-            // 如果不是外部应用 Scheme，也不是 HTTP/HTTPS，则返回 false，让 WebView 处理
-            return false
+        }
+
+        @Deprecated("Deprecated in Java", ReplaceWith("false"))
+        override fun shouldOverrideUrlLoading(view: WebView?, url: String?): Boolean {
+            return handleOverrideUrl(view, url)
+        }
+
+        override fun shouldOverrideUrlLoading(view: WebView?, request: WebResourceRequest?): Boolean {
+            val url = request?.url?.toString()
+            return handleOverrideUrl(view, url)
         }
 
         override fun doUpdateVisitedHistory(view: WebView?, url: String?, isReload: Boolean) {
