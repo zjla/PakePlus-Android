@@ -293,7 +293,8 @@ const initWebEnv = async (
     safeArea,
     userAgent,
     launchImage,
-    screenOn
+    screenOn,
+    clearCache
 ) => {
     const assetsPath = path.join(__dirname, '../app/src/main/assets')
     const appJsonPath = path.join(assetsPath, 'app.json')
@@ -318,6 +319,12 @@ const initWebEnv = async (
         appJsonObj.screenOn = true
     } else {
         appJsonObj.screenOn = false
+    }
+    // clearCache
+    if (clearCache) {
+        appJsonObj.clearCache = true
+    } else {
+        appJsonObj.clearCache = false
     }
     // set html
     if (isHtml) {
@@ -454,6 +461,8 @@ const main = async () => {
 
     // copy html to android res dir
     const userAgent = webview.userAgent
+    const clearCache = webview.clearCache
+    // set app.json
     await initWebEnv(
         isHtml,
         webUrl,
@@ -461,7 +470,8 @@ const main = async () => {
         safeArea,
         userAgent,
         launchImage,
-        screenOn
+        screenOn,
+        clearCache
     )
 
     // update manifest.xml
