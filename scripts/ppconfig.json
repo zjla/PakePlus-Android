@@ -82,6 +82,7 @@
         "internet": true,
         "position": true,
         "direction": "default",
+        "callPhone": false,
         "safeArea": {
             "top": 0,
             "bottom": 0,

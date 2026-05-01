@@ -294,7 +294,11 @@ const initWebEnv = async (
     userAgent,
     launchImage,
     screenOn,
-    clearCache
+    clearCache,
+    callPhone,
+    download,
+    internet,
+    position
 ) => {
     const assetsPath = path.join(__dirname, '../app/src/main/assets')
     const appJsonPath = path.join(assetsPath, 'app.json')
@@ -325,6 +329,30 @@ const initWebEnv = async (
         appJsonObj.clearCache = true
     } else {
         appJsonObj.clearCache = false
+    }
+    // set callPhone
+    if (callPhone) {
+        appJsonObj.callPhone = true
+    } else {
+        appJsonObj.callPhone = false
+    }
+    // set download
+    if (download) {
+        appJsonObj.download = true
+    } else {
+        appJsonObj.download = false
+    }
+    // set internet
+    if (internet) {
+        appJsonObj.internet = true
+    } else {
+        appJsonObj.internet = false
+    }
+    // set position
+    if (position) {
+        appJsonObj.position = true
+    } else {
+        appJsonObj.position = false
     }
     // set html
     if (isHtml) {
@@ -418,7 +446,17 @@ const updateManifest = async (direction = 'default') => {
 
 // Main execution
 const main = async () => {
-    const { webview, launchImage, screenOn, direction } = ppconfig.phone
+    const {
+        webview,
+        launchImage,
+        screenOn,
+        direction,
+        callPhone,
+        download,
+        internet,
+        position,
+    } = ppconfig.phone
+
     const {
         name,
         version,
@@ -471,7 +509,11 @@ const main = async () => {
         userAgent,
         launchImage,
         screenOn,
-        clearCache
+        clearCache,
+        callPhone,
+        download,
+        internet,
+        position
     )
 
     // update manifest.xml
