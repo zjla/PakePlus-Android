@@ -99,7 +99,7 @@
         "pwdTip": "",
         "pwdError": "",
         "endPwd": "123456",
-        "endPwdTitle": "Please enter the password",
+        "endPwdTitle": "",
         "endPwdTip": "",
         "endPwdError": "",
         "pwdStyle": "flat",
