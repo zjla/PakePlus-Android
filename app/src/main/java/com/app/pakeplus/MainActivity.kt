@@ -55,9 +55,11 @@ import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import org.json.JSONObject
 import java.net.URISyntaxException
+import java.net.URLDecoder
 import android.util.Base64
 import java.io.File
 import java.io.FileOutputStream
+import java.nio.charset.StandardCharsets
 import kotlin.math.abs
 
 class MainActivity : AppCompatActivity() {
@@ -268,7 +270,11 @@ class MainActivity : AppCompatActivity() {
         webView.webChromeClient = MyChromeClient(this)
 
         // 网页内下载：点击下载链接时由 DownloadManager 保存到系统下载目录
+        // blob:/data: 不能交给 DownloadManager，否则会抛异常甚至闪退（Canvas 导出常见）
         webView.setDownloadListener { url, userAgent, contentDisposition, mimetype, contentLength ->
+            if (tryHandleSpecialSchemeDownload(url, userAgent, contentDisposition, mimetype)) {
+                return@setDownloadListener
+            }
             startDownload(url, userAgent, contentDisposition, mimetype)
         }
 
@@ -553,35 +559,14 @@ class MainActivity : AppCompatActivity() {
         // 接收 base64 数据并保存为文件
         @JavascriptInterface
         fun downloadBase64File(base64Data: String, mimeType: String?, fileName: String?) {
-            try {
-                val bytes = Base64.decode(base64Data, Base64.DEFAULT)
-
-                // 统一保存到系统 Download 目录，和普通下载保持一致
-                val downloadsDir =
-                    Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
-                if (!downloadsDir.exists()) {
-                    downloadsDir.mkdirs()
+            (context as? MainActivity)?.runOnUiThread {
+                try {
+                    val bytes = Base64.decode(base64Data, Base64.DEFAULT)
+                    saveDecodedDownload(bytes, mimeType, fileName)
+                } catch (e: Exception) {
+                    Log.e("BlobDownload", "save error", e)
+                    showTopToast(context, "保存失败: ${e.message}", Toast.LENGTH_LONG)
                 }
-
-                val safeName = when {
-                    !fileName.isNullOrBlank() -> fileName
-                    !mimeType.isNullOrBlank() -> {
-                        val ext = MimeTypeMap.getSingleton()
-                            .getExtensionFromMimeType(mimeType) ?: "bin"
-                        "download_${System.currentTimeMillis()}.$ext"
-                    }
-
-                    else -> "download_${System.currentTimeMillis()}.bin"
-                }
-
-                val outFile = File(downloadsDir, safeName)
-                FileOutputStream(outFile).use { it.write(bytes) }
-
-                showTopToast(context, "已保存到下载目录: ${outFile.name}", Toast.LENGTH_LONG)
-                Log.d("BlobDownload", "File saved: ${outFile.absolutePath}")
-            } catch (e: Exception) {
-                Log.e("BlobDownload", "save error", e)
-                showTopToast(context, "保存失败: ${e.message}", Toast.LENGTH_LONG)
             }
         }
 
@@ -602,6 +587,126 @@ class MainActivity : AppCompatActivity() {
         @JavascriptInterface
         fun isApp(): Boolean {
             return true
+        }
+    }
+
+    /** 将解码后的文件写入公共 Download 目录（与 JsBridge / data: 下载共用） */
+    private fun saveDecodedDownload(bytes: ByteArray, mimeType: String?, fileName: String?) {
+        val downloadsDir =
+            Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
+        if (!downloadsDir.exists()) {
+            downloadsDir.mkdirs()
+        }
+
+        val safeName = when {
+            !fileName.isNullOrBlank() -> fileName
+            !mimeType.isNullOrBlank() -> {
+                val ext = MimeTypeMap.getSingleton()
+                    .getExtensionFromMimeType(mimeType) ?: "bin"
+                "download_${System.currentTimeMillis()}.$ext"
+            }
+
+            else -> "download_${System.currentTimeMillis()}.bin"
+        }
+
+        val outFile = File(downloadsDir, safeName)
+        FileOutputStream(outFile).use { it.write(bytes) }
+
+        showTopToast(this, "已保存到下载目录: ${outFile.name}", Toast.LENGTH_LONG)
+        Log.d("BlobDownload", "File saved: ${outFile.absolutePath}")
+    }
+
+    /**
+     * Canvas 等生成的 data:/blob: 链接不能走 DownloadManager。
+     * @return true 表示已处理或已主动放弃（切勿再 enqueue）
+     */
+    private fun tryHandleSpecialSchemeDownload(
+        url: String,
+        userAgent: String?,
+        contentDisposition: String?,
+        mimetype: String?
+    ): Boolean {
+        when {
+            url.startsWith("data:", ignoreCase = true) -> {
+                if (!trySaveDataUrlToDownloads(url, contentDisposition, mimetype)) {
+                    showTopToast(this, "无法保存此链接（data URL 解析失败）", Toast.LENGTH_SHORT)
+                }
+                return true
+            }
+
+            url.startsWith("blob:", ignoreCase = true) -> {
+                saveBlobUrlViaJavaScript(url, contentDisposition, mimetype)
+                return true
+            }
+
+            else -> return false
+        }
+    }
+
+    private fun trySaveDataUrlToDownloads(
+        dataUrl: String,
+        contentDisposition: String?,
+        mimetype: String?
+    ): Boolean {
+        return try {
+            val comma = dataUrl.indexOf(',')
+            if (comma < 0) return false
+            val meta = dataUrl.substring(5, comma)
+            val payload = dataUrl.substring(comma + 1)
+            val isBase64 = meta.contains(";base64", ignoreCase = true)
+            val mimeFromMeta = meta.substringBefore(';').trim().takeIf { it.isNotEmpty() }
+            val effectiveMime = mimetype?.takeIf { it.isNotBlank() } ?: mimeFromMeta
+            val bytes = if (isBase64) {
+                Base64.decode(payload, Base64.DEFAULT)
+            } else {
+                URLDecoder.decode(payload, StandardCharsets.UTF_8.name())
+                    .toByteArray(StandardCharsets.UTF_8)
+            }
+            val name = URLUtil.guessFileName(dataUrl, contentDisposition, effectiveMime)
+            saveDecodedDownload(bytes, effectiveMime, name)
+            true
+        } catch (e: Exception) {
+            Log.e("WebViewDownload", "data URL save failed", e)
+            false
+        }
+    }
+
+    /** DownloadListener 收到 blob: 时走 WebView 内 fetch + JsBridge（与页面注入逻辑一致） */
+    private fun saveBlobUrlViaJavaScript(
+        blobUrl: String,
+        contentDisposition: String?,
+        mimetype: String?
+    ) {
+        val quotedUrl = JSONObject.quote(blobUrl)
+        val guessed = URLUtil.guessFileName(blobUrl, contentDisposition, mimetype)
+        val quotedName = JSONObject.quote(guessed)
+        val script = """
+            (function(){
+              try {
+                var u = $quotedUrl;
+                var defaultName = $quotedName;
+                fetch(u).then(function(r){ return r.blob(); }).then(function(blob){
+                  var reader = new FileReader();
+                  reader.onloadend = function() {
+                    try {
+                      var dataUrl = reader.result || '';
+                      var i = dataUrl.indexOf(',');
+                      var b64 = i >= 0 ? dataUrl.substring(i + 1) : dataUrl;
+                      var mime = blob.type || 'application/octet-stream';
+                      if (window.JsBridge && window.JsBridge.downloadBase64File) {
+                        window.JsBridge.downloadBase64File(b64, mime, defaultName);
+                      }
+                    } catch (e) { console.error(e); }
+                  };
+                  reader.readAsDataURL(blob);
+                }).catch(function(e){ console.error('blob fetch', e); });
+              } catch (e2) { console.error(e2); }
+            })();
+        """.trimIndent()
+        webView.post {
+            if (::webView.isInitialized) {
+                webView.evaluateJavascript(script, null)
+            }
         }
     }
 
@@ -662,8 +767,13 @@ class MainActivity : AppCompatActivity() {
         }
 
         val dm = getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager
-        dm.enqueue(request)
-        showTopToast(this, getString(R.string.download_started), Toast.LENGTH_SHORT)
+        try {
+            dm.enqueue(request)
+            showTopToast(this, getString(R.string.download_started), Toast.LENGTH_SHORT)
+        } catch (e: Exception) {
+            Log.e("WebViewDownload", "DownloadManager.enqueue failed: $url", e)
+            showTopToast(this, "下载失败: ${e.message}", Toast.LENGTH_LONG)
+        }
     }
 
     /**
@@ -860,7 +970,7 @@ class MainActivity : AppCompatActivity() {
             view?.post {
                 if (!mainFrameLoadError) hideSplashOverlay()
             }
-            // 注入脚本，拦截 blob: 链接并通过 JsBridge 保存到本地
+            // 注入脚本，拦截 blob:/data: 链接并通过 JsBridge 保存到本地（避免走 DownloadManager 闪退）
             val blobInterceptor = """
                 (function () {
                   if (window.__blobDownloadInjected) return;
@@ -876,15 +986,33 @@ class MainActivity : AppCompatActivity() {
                       if (!target) return;
                       
                       var href = target.getAttribute('href');
-                      if (!href || href.indexOf('blob:') !== 0) return;
+                      if (!href) return;
+                      var isBlob = href.indexOf('blob:') === 0;
+                      var isData = href.indexOf('data:') === 0;
+                      if (!isBlob && !isData) return;
                       
-                      // 拦截浏览器默认行为
                       e.preventDefault();
                       e.stopPropagation();
                       
                       var fileName = target.getAttribute('download') || 'download-' + Date.now();
                       
-                      // 通过 fetch 拿到 blob，再转 base64 交给原生
+                      if (isData) {
+                        try {
+                          var comma = href.indexOf(',');
+                          if (comma < 0) return;
+                          var meta = href.substring(5, comma);
+                          var payload = href.substring(comma + 1);
+                          if (meta.indexOf(';base64') === -1) return;
+                          var mime = (meta.split(';')[0] || 'application/octet-stream').trim();
+                          if (window.JsBridge && window.JsBridge.downloadBase64File) {
+                            window.JsBridge.downloadBase64File(payload, mime, fileName);
+                          }
+                        } catch (errD) {
+                          console.error('data: download error', errD);
+                        }
+                        return;
+                      }
+                      
                       fetch(href)
                         .then(function (res) { return res.blob(); })
                         .then(function (blob) {
